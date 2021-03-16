@@ -34,7 +34,7 @@ jobs:
       - name: grant execute permission for gradlew
         run: chmod +x gradlew
       - name: build with Gradle
-        run: ./gradlew :keycloak:installDist
+        run: ./gradlew installDist
       - name: set up QEMU
         uses: docker/setup-qemu-action@v1
         with:
