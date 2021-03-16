@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Set tag
         if: github.event.inputs.tag != ''
-        run: echo "::set-env name=TAG::${{ github.event.inputs.tag }}"
+        run: echo "TAG=${{ github.event.inputs.tag || env.TAG }}" >> $GITHUB_ENV
       - uses: actions/checkout@v2
       - name: set up JDK 1.8
         uses: actions/setup-java@v1
