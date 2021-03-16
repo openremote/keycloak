@@ -1,11 +1,15 @@
 apply plugin: "java"
 version = ""
 
+repositories {
+    mavenCentral()
+}
+
 dependencies {
-    compile "org.keycloak:keycloak-core:$keycloakVersion"
-    compile "org.keycloak:keycloak-services:$keycloakVersion"
-    compile "org.keycloak:keycloak-server-spi:$keycloakVersion"
-    compile "org.keycloak:keycloak-server-spi-private:$keycloakVersion"
+    compile "org.keycloak:keycloak-core:12.0.1"
+    compile "org.keycloak:keycloak-services:12.0.1"
+    compile "org.keycloak:keycloak-server-spi:12.0.1"
+    compile "org.keycloak:keycloak-server-spi-private:12.0.1"
 }
 
 jar {
