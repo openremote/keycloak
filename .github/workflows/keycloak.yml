@@ -8,9 +8,9 @@ on:
       tag:
         description: 'What tag should be used for the release.'
         required: true
-  # Triggers the workflow on push or pull request events but only for the master branch and will push docker image with latest tag
+
+  # Trigger on push for latest build
   push:
-    branches: [ master ]
 
 jobs:
 
