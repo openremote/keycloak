@@ -8,8 +8,11 @@ on:
 
   # Trigger on push for latest build ignoring tag pushes
   push:
-    tags-ignore:
-          - '*.*'
+    tags:
+      - '!**'
+    branches:
+      - main
+
 jobs:
 
   image_keycloak:
