@@ -6,9 +6,10 @@ on:
   release:
     types: [published]
 
-  # Trigger on push for latest build
+  # Trigger on push for latest build ignoring tag pushes
   push:
-
+    tags-ignore:
+          - '*.*'
 jobs:
 
   image_keycloak:
