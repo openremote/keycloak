@@ -25,7 +25,7 @@ jobs:
   image_keycloak:
   
     env:
-      PLATFORM: linux/amd64,linux/arm64,linux/arm/v7
+      PLATFORM: linux/amd64,linux/arm64
       TAG: latest
 
     runs-on: ubuntu-latest
