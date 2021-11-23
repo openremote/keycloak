@@ -48,9 +48,9 @@
             <div class="section">
                 <div class="card-panel">
                     <#if message.type=='success' ><i class="material-icons green-text">check_circle</i><span
-                            class="green-text">${message.summary}</span></#if>
+                            class="green-text">{kcSanitize(message.summary)?no_esc}</span></#if>
                     <#if message.type=='error' ><i class="material-icons red-text">error</i><span
-                            class="red-text">${message.summary}</span></#if>
+                            class="red-text">{kcSanitize(message.summary)?no_esc}</span></#if>
                 </div>
             </div>
         </#if>
