@@ -65,13 +65,13 @@
                         <div class="section">
                             <div class="card-panel">
                                 <#if message.type=='success' ><i class="material-icons green-text">check_circle</i><span
-                                        class="green-text">{kcSanitize(message.summary)?no_esc}</span></#if>
+                                        class="green-text">${kcSanitize(message.summary)?no_esc}</span></#if>
                                 <#if message.type=='warning' ><i class="material-icons orange-text">warning</i><span
-                                        class="orange-text">{kcSanitize(message.summary)?no_esc}</span></#if>
+                                        class="orange-text">${kcSanitize(message.summary)?no_esc}</span></#if>
                                 <#if message.type=='error' ><i class="material-icons red-text">error</i><span
-                                        class="red-text">{kcSanitize(message.summary)?no_esc}</span></#if>
+                                        class="red-text">${kcSanitize(message.summary)?no_esc}</span></#if>
                                 <#if message.type=='info' ><i class="material-icons blue-text">info</i><span
-                                        class="blue-text">{kcSanitize(message.summary)?no_esc}</span></#if>
+                                        class="blue-text">${kcSanitize(message.summary)?no_esc}</span></#if>
                             </div>
                         </div>
                     </#if>
