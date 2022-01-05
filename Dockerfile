@@ -1,11 +1,18 @@
-FROM registry.access.redhat.com/ubi8-minimal
+# ------------------------------------------------------------------------------------
+# Keycloak image built for aarch64 and also adds a custom provider for resolving
+# themes that fallsback to the default openremote theme rather than just breaking.
+# See this issue for aarch64 support:
+# 
+#    https://github.com/keycloak/keycloak-containers/issues/341
+# ------------------------------------------------------------------------------------
+FROM registry.access.redhat.com/ubi8/openjdk-11-runtime
 MAINTAINER support@openremote.io
 
 # Add git commit label must be specified at build time using --build-arg GIT_COMMIT=dadadadadad
 ARG GIT_COMMIT=unknown
 LABEL git-commit=$GIT_COMMIT
 
-ENV KEYCLOAK_VERSION 13.0.1
+ENV KEYCLOAK_VERSION 16.0.0
 ENV JDBC_POSTGRES_VERSION 42.2.5
 ENV JDBC_MYSQL_VERSION 8.0.22
 ENV JDBC_MARIADB_VERSION 2.5.4
@@ -34,7 +41,7 @@ ARG KEYCLOAK_DIST=https://github.com/keycloak/keycloak/releases/download/$KEYCLO
 
 USER root
 
-RUN microdnf update -y && microdnf install -y glibc-langpack-en gzip hostname java-11-openjdk-headless openssl tar which && microdnf clean all
+RUN microdnf update -y && microdnf install -y glibc-langpack-en gzip hostname openssl tar which && microdnf clean all
 
 ADD tools /opt/jboss/tools
 RUN chmod -R +x /opt/jboss/tools
@@ -51,6 +58,8 @@ HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=30 CMD curl 
 USER 1000
 
 EXPOSE 8080
+EXPOSE 8443
 
-ENTRYPOINT ["/opt/jboss/tools/docker-entrypoint.sh"]
+ENTRYPOINT [ "/opt/jboss/tools/docker-entrypoint.sh" ]
+
 CMD ["-b", "0.0.0.0"]
