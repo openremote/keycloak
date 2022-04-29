@@ -32,6 +32,8 @@ ENV DB_SCHEMA ${DB_SCHEMA:-public}
 ENV KEYCLOAK_USER ${KEYCLOAK_USER:-admin}
 ENV KEYCLOAK_PASSWORD ${SETUP_ADMIN_PASSWORD:-secret}
 ENV PROXY_ADDRESS_FORWARDING ${PROXY_ADDRESS_FORWARDING:-true}
+ENV HTTP_ENABLED ${HTTP_ENABLED:-true}
+ENV HTTPS_ENABLED ${HTTPS_ENABLED:-false}
 ENV KEYCLOAK_FRONTEND_URL ${KEYCLOAK_FRONTEND_URL:-}
 ENV TZ ${TZ:-Europe/Amsterdam}
 
@@ -41,6 +43,7 @@ ARG KEYCLOAK_DIST=https://github.com/keycloak/keycloak/releases/download/$KEYCLO
 
 USER root
 
+RUN chown jboss:jboss /home/jboss
 RUN microdnf update -y && microdnf install -y glibc-langpack-en gzip hostname openssl tar which && microdnf clean all
 
 ADD tools /opt/jboss/tools
@@ -53,7 +56,7 @@ ADD themes /opt/jboss/keycloak/themes
 ADD module.xml /opt/jboss/keycloak/providers
 ADD build/image/openremote-keycloak.jar /opt/jboss/keycloak/providers
 
-HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=30 CMD curl --fail --silent http://localhost:8080/auth || exit 1
+HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl --fail --silent http://localhost:8080/auth || exit 1
 
 USER 1000
 
