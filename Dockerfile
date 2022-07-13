@@ -1,68 +1,62 @@
 # ------------------------------------------------------------------------------------
-# Keycloak image built for aarch64 and also adds a custom provider for resolving
-# themes that fallsback to the default openremote theme rather than just breaking.
-# See this issue for aarch64 support:
-# 
-#    https://github.com/keycloak/keycloak-containers/issues/341
+# Keycloak image built for postgresql support with theme handling customisation
+# to always fallback to standard openremote theme.
 # ------------------------------------------------------------------------------------
-FROM registry.access.redhat.com/ubi8/openjdk-11-runtime
+ARG VERSION=18.0.2
+FROM quay.io/keycloak/keycloak:${VERSION} as builder
 MAINTAINER support@openremote.io
 
 # Add git commit label must be specified at build time using --build-arg GIT_COMMIT=dadadadadad
 ARG GIT_COMMIT=unknown
 LABEL git-commit=$GIT_COMMIT
 
-ENV KEYCLOAK_VERSION 16.1.1
-ENV JDBC_POSTGRES_VERSION 42.2.5
-ENV JDBC_MYSQL_VERSION 8.0.22
-ENV JDBC_MARIADB_VERSION 2.5.4
-ENV JDBC_MSSQL_VERSION 8.2.2.jre11
+# Configure build options
+ENV KC_HEALTH_ENABLED=true
+ENV KC_METRICS_ENABLED=true
+ENV KC_FEATURES=token-exchange
+ENV KC_DB=postgres
+ENV KC_HTTP_RELATIVE_PATH=/auth
 
-ENV LAUNCH_JBOSS_IN_BACKGROUND 1
-ENV JBOSS_HOME /opt/jboss/keycloak
-ENV LANG en_US.UTF-8
+# Install openremote theme
+ADD build/image/openremote-theme.jar /opt/keycloak/providers
 
-ENV DB_VENDOR ${DB_VENDOR:-postgres}
-ENV DB_ADDR ${DB_ADDR:-postgresql}
-ENV DB_PORT ${DB_PORT:-5432}
-ENV DB_DATABASE ${DB_DATABASE:-openremote}
-ENV DB_USER ${DB_USER:-postgres}
-ENV DB_PASSWORD ${DB_PASSWORD:-postgres}
-ENV DB_SCHEMA ${DB_SCHEMA:-public}
-ENV KEYCLOAK_USER ${KEYCLOAK_USER:-admin}
-ENV KEYCLOAK_PASSWORD ${SETUP_ADMIN_PASSWORD:-secret}
-ENV PROXY_ADDRESS_FORWARDING ${PROXY_ADDRESS_FORWARDING:-true}
-ENV HTTP_ENABLED ${HTTP_ENABLED:-true}
-ENV HTTPS_ENABLED ${HTTPS_ENABLED:-false}
-ENV KEYCLOAK_FRONTEND_URL ${KEYCLOAK_FRONTEND_URL:-}
-ENV TZ ${TZ:-Europe/Amsterdam}
+# Install keycloak metrics provider
+RUN curl -sL https://github.com/aerogear/keycloak-metrics-spi/releases/download/2.5.3/keycloak-metrics-spi-2.5.3.jar -o /opt/keycloak/providers/keycloak-metrics-spi-2.5.3.jar
 
-ARG GIT_REPO
-ARG GIT_BRANCH
-ARG KEYCLOAK_DIST=https://github.com/keycloak/keycloak/releases/download/$KEYCLOAK_VERSION/keycloak-$KEYCLOAK_VERSION.tar.gz
+# Build custom image and copy into this new image
+RUN /opt/keycloak/bin/kc.sh build
+FROM quay.io/keycloak/keycloak:${VERSION}
+COPY --from=builder /opt/keycloak/ /opt/keycloak/
 
-USER root
-
-RUN chown jboss:jboss /home/jboss
-RUN microdnf update -y && microdnf install -y glibc-langpack-en gzip hostname openssl tar which && microdnf clean all
-
-ADD tools /opt/jboss/tools
-RUN chmod -R +x /opt/jboss/tools
-RUN /opt/jboss/tools/build-keycloak.sh
-
-RUN mkdir -p /opt/jboss/keycloak/providers
+# Create standard deployment path and symlink themes (cannot --spi-theme-dir=/deployment/keycloak/themes)
+USER 0
+RUN rm -r /opt/keycloak/themes
 RUN mkdir -p /deployment/keycloak/themes
-ADD themes /opt/jboss/keycloak/themes
-ADD module.xml /opt/jboss/keycloak/providers
-ADD build/image/openremote-keycloak.jar /opt/jboss/keycloak/providers
+RUN ln -s /deployment/keycloak/themes /opt/keycloak
+USER 1000
+
+WORKDIR /opt/keycloak
+
+# Configure runtime options
+ENV TZ=Europe/Amsterdam
+ENV KC_DB_URL_HOST=postgresql
+ENV KC_DB_URL_PORT=5432
+ENV KC_DB_URL_DATABASE=openremote
+ENV KC_DB_SCHEMA=public
+ENV KC_DB_USERNAME=postgres
+ENV KC_DB_PASSWORD=postgres
+ENV KC_HOSTNAME=localhost
+ENV KC_PROXY=edge
+ENV KEYCLOAK_ADMIN=admin
+ENV KEYCLOAK_ADMIN_PASSWORD=secret
+ENV KC_LOG_LEVEL=info
+ENV KEYCLOAK_DEFAULT_THEME=openremote
+ENV KEYCLOAK_ACCOUNT_THEME=openremote
+ENV KEYCLOAK_WELCOME_THEME=keycloak
+ENV KEYCLOAK_START_COMMAND=start
 
 HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl --fail --silent http://localhost:8080/auth || exit 1
 
-USER 1000
-
 EXPOSE 8080
-EXPOSE 8443
 
-ENTRYPOINT [ "/opt/jboss/tools/docker-entrypoint.sh" ]
-
-CMD ["-b", "0.0.0.0"]
+ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --spi-theme-default=${KEYCLOAK_DEFAULT_THEME:-openremote} --spi-theme-account-theme=${KEYCLOAK_ACCOUNT_THEME:-openremote} --spi-theme-welcome-theme=${KEYCLOAK_WELCOME_THEME:-keycloak} ${KEYCLOAK_START_OPTS:-}

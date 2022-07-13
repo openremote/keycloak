@@ -3,7 +3,7 @@
     <#if section = "title">
         ${msg("loginTitle",(realm.displayName!''))}
     <#elseif section = "header">
-        ${msg("loginTitleHtml",(realm.displayNameHtml!''))}
+        ${kcSanitize(msg("loginTitleHtml",(realm.displayNameHtml!'')))?no_esc}
     <#elseif section = "form">
         <#if realm.password>
         <form onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
@@ -18,18 +18,33 @@
                     <#else>
                         <input id="username"
                                autofocus
+                               minlength=1
                                autocomplete="off"
                                autocapitalize="off"
                                required
-                               class="validate"
+                               aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
+                               class="validate <#if messagesPerField.existsError('username','password')>invalid</#if>"
                                name="username" value="${(login.username!'')}" type="text"/>
                     </#if>
                     <label for="username"><#if !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if></label>
+                    <#if messagesPerField.existsError('username','password')>
+                       <span class="helper-text" data-error="${kcSanitize(messagesPerField.getFirstError('username','password'))?no_esc}"></span>
+                    </#if>
                 </div>
 
                 <div class="input-field col s12">
-                    <input id="password" name="password" type="password" autocomplete="off" aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>" />
+                    <input id="password"
+                           name="password"
+                           type="password"
+                           required
+                           minlength=1
+                           autocomplete="off"
+                           aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
+                           class="validate <#if messagesPerField.existsError('username','password')>invalid</#if>" />
                     <label for="password">${msg("password")}</label>
+                    <#if messagesPerField.existsError('username','password')>
+                       <span class="helper-text" data-error="${kcSanitize(messagesPerField.getFirstError('username','password'))?no_esc}"></span>
+                    </#if>
                 </div>
 
                 <#if realm.rememberMe && !usernameEditDisabled??>

@@ -1,9 +1,8 @@
-<#macro registrationLayout displayInfo=false displayMessage=true>
+<#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false>
 <!DOCTYPE html>
-<html>
+<html class="${properties.kcHtmlClass!}">
 <head>
-    <title>${msg("applicationName")}</title>
-
+	<meta charset="utf-8">
     <meta http-equiv="content-type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
@@ -13,11 +12,11 @@
             <meta name="${meta?split('==')[0]}" content="${meta?split('==')[1]}"/>
         </#list>
     </#if>
-
+	<title>${msg("applicationName")}</title>
     <link rel="icon" type="image/png" href="${url.resourcesPath}/img/favicon.png"/>
     <link type=text/css rel="stylesheet" href="${url.resourcesPath}/css/materialize.min.css" media="screen,projection"/>
     <link rel="stylesheet" href="${url.resourcesPath}/css/styles.css"/>
-
+	<script type="text/javascript" src="${url.resourcesPath}/js/materialize.min.js"></script>
 </head>
 
 <body>
@@ -48,7 +47,7 @@
                         </div>
                     </div>
 
-                    <#if realm.internationalizationEnabled>
+                    <#if realm.internationalizationEnabled  && locale.supported?size gt 1>
                         <div class="col m12" id="kc-locale">
                             <div id="kc-locale-dropdown">
                                 <a href="#" id="kc-current-locale-link">${locale.current}</a>
@@ -61,7 +60,7 @@
                         </div>
                     </#if>
 
-                    <#if displayMessage && message?has_content>
+                    <#if displayMessage && message?has_content && (message.type != 'warning' || !isAppInitiatedAction??)>
                         <div class="section">
                             <div class="card-panel">
                                 <#if message.type=='success' ><i class="material-icons green-text">check_circle</i><span
@@ -92,7 +91,6 @@
         </div>
     </div>
 </div>
-<script type="text/javascript" src="${url.resourcesPath}/js/materialize.min.js"></script>
 </body>
 </html>
 </#macro>

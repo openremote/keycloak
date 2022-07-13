@@ -1,0 +1,6 @@
+{
+  "themes": [{
+    "name" : "openremote",
+    "types": [ "login", "email", "account" ]
+  }]
+}
