@@ -2,9 +2,16 @@
 # Keycloak image built for postgresql support with theme handling customisation
 # to always fallback to standard openremote theme.
 # ------------------------------------------------------------------------------------
-ARG VERSION=18.0.2
-FROM quay.io/keycloak/keycloak:${VERSION} as builder
+ARG VERSION=23.0
+FROM registry.access.redhat.com/ubi9 AS ubi-micro-build
 MAINTAINER support@openremote.io
+
+RUN mkdir -p /mnt/rootfs
+RUN dnf install --installroot /mnt/rootfs curl --releasever 9 --setopt install_weak_deps=false --nodocs -y && \
+    dnf --installroot /mnt/rootfs clean all && \
+    rpm --root /mnt/rootfs -e --nodeps setup
+
+FROM quay.io/keycloak/keycloak:${VERSION} AS builder
 
 # Add git commit label must be specified at build time using --build-arg GIT_COMMIT=dadadadadad
 ARG GIT_COMMIT=unknown
@@ -18,24 +25,27 @@ ENV KC_DB=postgres
 ENV KC_HTTP_RELATIVE_PATH=/auth
 
 # Install openremote theme
-ADD build/image/openremote-theme.jar /opt/keycloak/providers
+ADD --chown=keycloak:keycloak build/image/openremote-theme.jar /opt/keycloak/providers
 
-# Install keycloak metrics provider
-RUN curl -sL https://github.com/aerogear/keycloak-metrics-spi/releases/download/2.5.3/keycloak-metrics-spi-2.5.3.jar -o /opt/keycloak/providers/keycloak-metrics-spi-2.5.3.jar
+WORKDIR /opt/keycloak
 
 # Build custom image and copy into this new image
 RUN /opt/keycloak/bin/kc.sh build
 FROM quay.io/keycloak/keycloak:${VERSION}
+
+# Copy custom build
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
+
+# Copy RPM packages
+COPY --from=ubi-micro-build /mnt/rootfs /
 
 # Create standard deployment path and symlink themes (cannot --spi-theme-dir=/deployment/keycloak/themes)
 USER 0
 RUN rm -r /opt/keycloak/themes
 RUN mkdir -p /deployment/keycloak/themes
+RUN chown keycloak:root /deployment/keycloak/themes
 RUN ln -s /deployment/keycloak/themes /opt/keycloak
-USER 1000
-
-WORKDIR /opt/keycloak
+#USER 1000
 
 # Configure runtime options
 ENV TZ=Europe/Amsterdam
@@ -59,4 +69,5 @@ HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl
 
 EXPOSE 8080
 
-ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --spi-theme-default=${KEYCLOAK_DEFAULT_THEME:-openremote} --spi-theme-account-theme=${KEYCLOAK_ACCOUNT_THEME:-openremote} --spi-theme-welcome-theme=${KEYCLOAK_WELCOME_THEME:-keycloak} ${KEYCLOAK_START_OPTS:-}
+#ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --optimized --spi-theme-default=${KEYCLOAK_DEFAULT_THEME:-openremote} --spi-theme-account-theme=${KEYCLOAK_ACCOUNT_THEME:-openremote} --spi-theme-welcome-theme=${KEYCLOAK_WELCOME_THEME:-keycloak} ${KEYCLOAK_START_OPTS:-}
+ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --optimized
