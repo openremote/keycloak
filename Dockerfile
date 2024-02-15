@@ -64,12 +64,9 @@ ENV KC_LOG_LEVEL=info
 ENV KEYCLOAK_DEFAULT_THEME=openremote
 ENV KEYCLOAK_ACCOUNT_THEME=openremote
 ENV KEYCLOAK_WELCOME_THEME=keycloak
-ENV KEYCLOAK_START_COMMAND=start
-#ENV KC_DB_POOL_MAX_SIZE=
 
 HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl --fail --silent http://localhost:8080/auth || exit 1
 
 EXPOSE 8080
 
 ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --optimized --spi-theme-login-default=${KEYCLOAK_LOGIN_THEME:-openremote} --spi-theme-account-theme=${KEYCLOAK_ACCOUNT_THEME:-openremote} --spi-theme-welcome-theme=${KEYCLOAK_WELCOME_THEME:-keycloak} --spi-theme-admin-theme=${KEYCLOAK_ADMIN_THEME:-keycloak} ${KEYCLOAK_START_OPTS:-}
-#ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --optimized
