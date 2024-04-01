@@ -25,7 +25,8 @@ ENV KC_DB=postgres
 ENV KC_HTTP_RELATIVE_PATH=/auth
 
 # Install openremote theme
-ADD --chown=keycloak:keycloak build/image/openremote-theme.jar /opt/keycloak/providers
+ADD --chown=keycloak:keycloak build/libs/openremote-theme.jar /opt/keycloak/providers
+ADD --chown=keycloak:keycloak providers/ /opt/keycloak/providers
 
 WORKDIR /opt/keycloak
 
@@ -35,6 +36,7 @@ RUN /opt/keycloak/bin/kc.sh build
 FROM quay.io/keycloak/keycloak:${VERSION}
 
 # Copy custom build
+COPY --from=builder /opt/keycloak/providers/ /opt/keycloak/providers/
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
 
 # Copy RPM packages
@@ -69,4 +71,4 @@ HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl
 
 EXPOSE 8080
 
-ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --optimized --spi-theme-login-default=${KEYCLOAK_LOGIN_THEME:-openremote} --spi-theme-account-theme=${KEYCLOAK_ACCOUNT_THEME:-openremote} --spi-theme-welcome-theme=${KEYCLOAK_WELCOME_THEME:-keycloak} --spi-theme-admin-theme=${KEYCLOAK_ADMIN_THEME:-keycloak} ${KEYCLOAK_START_OPTS:-}
+ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --spi-theme-login-default=${KEYCLOAK_LOGIN_THEME:-openremote} --spi-theme-account-theme=${KEYCLOAK_ACCOUNT_THEME:-openremote} --spi-theme-welcome-theme=${KEYCLOAK_WELCOME_THEME:-keycloak} --spi-theme-admin-theme=${KEYCLOAK_ADMIN_THEME:-keycloak} ${KEYCLOAK_START_OPTS:-}
