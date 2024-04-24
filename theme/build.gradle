@@ -1,0 +1,13 @@
+plugins {
+    id 'java'
+}
+
+jar {
+    archivesBaseName = "openremote-theme-provider"
+}
+
+task installDist(type: Copy) {
+    into "${rootDir}/build/image"
+
+    from jar.outputs
+}

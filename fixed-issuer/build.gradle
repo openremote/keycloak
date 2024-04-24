@@ -1,0 +1,39 @@
+plugins {
+    id 'java'
+}
+
+configurations {
+    jarLibs
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.keycloak:keycloak-services:23.0.7'
+    implementation 'org.keycloak:keycloak-server-spi:23.0.7'
+    implementation 'net.bytebuddy:byte-buddy:1.14.7'
+    implementation 'net.bytebuddy:byte-buddy-agent:1.14.7'
+    jarLibs 'net.bytebuddy:byte-buddy-agent:1.14.7'
+    implementation 'org.slf4j:slf4j-api:2.0.13'
+    compileOnly 'org.projectlombok:lombok:1.18.32'
+    annotationProcessor 'org.projectlombok:lombok:1.18.32'
+    compileOnly 'com.google.auto.service:auto-service:1.1.1'
+    annotationProcessor 'com.google.auto.service:auto-service:1.1.1'
+}
+
+jar {
+    archivesBaseName = "openremote-issuer-provider"
+    from {
+        configurations.jarLibs.collect {
+            zipTree(it)
+        }
+    }
+}
+
+task installDist(type: Copy) {
+    into "${rootDir}/build/image"
+
+    from jar.outputs
+}
