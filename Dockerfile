@@ -57,7 +57,6 @@ ENV KC_DB_URL_DATABASE=openremote
 ENV KC_DB_SCHEMA=public
 ENV KC_DB_USERNAME=postgres
 ENV KC_DB_PASSWORD=postgres
-ENV KC_HOSTNAME=localhost
 ENV KC_HTTP_ENABLED=true
 # Pre V24 proxy setting
 ENV KC_PROXY=edge
