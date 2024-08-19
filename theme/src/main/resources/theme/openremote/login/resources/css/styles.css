@@ -112,7 +112,25 @@ i.material-icons {
     background-color: var(--app-primary-color) !important;
 }
 
+#kc-otp-credential-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 12px;
+}
+
+#kc-otp-credential-box div {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
 [type="checkbox"]:checked + span:not(.lever):before {
     border-right: 2px solid var(--app-primary-color) !important;
     border-bottom: 2px solid var(--app-primary-color) !important;
+}
+
+[type="radio"]:not(:checked), [type="radio"]:checked {
+    position: relative;
+    opacity: 1;
 }
