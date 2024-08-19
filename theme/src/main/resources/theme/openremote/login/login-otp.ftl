@@ -8,7 +8,7 @@
             <#if otpLogin.userOtpCredentials?size gt 1>
                 <div class="${properties.kcFormGroupClass!}">
                     <div class="${properties.kcInputWrapperClass!}">
-                        <label>Select your 2FA device</label>
+                        <label>${msg("select2faDevice", "Select your 2FA device")}</label>
                         <div id="kc-otp-credential-box">
                             <#list otpLogin.userOtpCredentials as otpCredential>
                                 <div>
