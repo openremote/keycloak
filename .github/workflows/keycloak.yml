@@ -95,6 +95,5 @@ jobs:
           sarif_file: ${{ steps.keycloak-anchore-scan.outputs.sarif }}
 
       - name: Inspect Anchore scan SARIF report
-        if: |
-          !cancelled()
+        if: !cancelled()
         run: cat ${{ steps.keycloak-anchore-scan.outputs.sarif }}
