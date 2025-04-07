@@ -58,6 +58,7 @@ ENV KC_DB_SCHEMA=public
 ENV KC_DB_USERNAME=postgres
 ENV KC_DB_PASSWORD=postgres
 ENV KC_HTTP_ENABLED=true
+ENV KC_LOG_CONSOLE_FORMAT='%-5p [%c] (%t) %s%e%n'
 # Pre V24 proxy setting
 ENV KC_PROXY=edge
 # V24+ proxy setting
