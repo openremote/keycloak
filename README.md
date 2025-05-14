@@ -12,6 +12,25 @@ this is to allow a private deployment to be accessed over a reverse tunnel, when
   * `KC_HOSTNAME_STRICT: false`
 * OpenRemote theme embedded and set as default
 * Request path to `/auth` (like older versions of Keycloak to simplify usage behind a reverse proxy)
+* Listener to configure roles of self-registered users. Roles are set using `KEYCLOAK_SELF_REGISTERED_USER_ROLES` environment variable,  
+the JSON structure is
+```
+{
+  "realmRoles" : [ "restricted_user" ],
+  "clientRoles" : [
+    {
+      "client": "openremote",
+      "roles": [
+        "read:assets",
+        "write:attributes"
+      ]
+    }
+  ]
+}
+```
+When assigning to the environment variable, it must be enclosed in double-quotes, properly escaped.  
+This can be done e.g. by piping to `jq -c | sed 's/"/\\"/g'`, which would result in `"{\"realmRoles\":[\"restricted_user\"],\"clientRoles\":[{\"client\":\"openremote\",\"roles\":[\"read:assets\",\"write:attributes\"]}]}"`  
+The listener is not enabled by default. In Keycloak, in the `Realm settings` - `Events` - `Event listeners` admin screen, `self-register-user-configure` should be added to the list.
 
 ## Working on the OpenRemote theme
 The openremote theme template files are located in `src/main/resources/theme/openremote`; to work on the OpenRemote theme use:

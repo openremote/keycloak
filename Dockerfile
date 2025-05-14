@@ -27,6 +27,7 @@ ENV KC_HTTP_RELATIVE_PATH=/auth
 # Install custom providers
 ADD --chown=keycloak:keycloak build/image/openremote-theme-provider.jar /opt/keycloak/providers
 ADD --chown=keycloak:keycloak build/image/openremote-issuer-provider.jar /opt/keycloak/providers
+ADD --chown=keycloak:keycloak build/image/openremote-self-register-configure-event-listener.jar /opt/keycloak/providers
 
 WORKDIR /opt/keycloak
 
@@ -69,9 +70,10 @@ ENV KEYCLOAK_ADMIN_PASSWORD=secret
 ENV KEYCLOAK_DEFAULT_THEME=openremote
 ENV KEYCLOAK_ACCOUNT_THEME=openremote
 ENV KEYCLOAK_WELCOME_THEME=keycloak
+ENV KEYCLOAK_SELF_REGISTERED_USER_ROLES="{ }"
 
 HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl --head -fsS http://localhost:8080/auth/health/ready || exit 1
 
 EXPOSE 8080
 
-ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --optimized --spi-initializer-issuer-base-uri=${KEYCLOAK_ISSUER_BASE_URI:-} --spi-theme-login-default=${KEYCLOAK_LOGIN_THEME:-openremote} --spi-theme-account-theme=${KEYCLOAK_ACCOUNT_THEME:-openremote} --spi-theme-welcome-theme=${KEYCLOAK_WELCOME_THEME:-keycloak} --spi-theme-admin-theme=${KEYCLOAK_ADMIN_THEME:-keycloak} ${KEYCLOAK_START_OPTS:-}
+ENTRYPOINT /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --optimized --spi-initializer-issuer-base-uri=${KEYCLOAK_ISSUER_BASE_URI:-} --spi-events-listener-self-register-user-configure-self-registered-user-roles="${KEYCLOAK_SELF_REGISTERED_USER_ROLES:-}" --spi-theme-login-default=${KEYCLOAK_LOGIN_THEME:-openremote} --spi-theme-account-theme=${KEYCLOAK_ACCOUNT_THEME:-openremote} --spi-theme-welcome-theme=${KEYCLOAK_WELCOME_THEME:-keycloak} --spi-theme-admin-theme=${KEYCLOAK_ADMIN_THEME:-keycloak} ${KEYCLOAK_START_OPTS:-}
