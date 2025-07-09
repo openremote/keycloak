@@ -1,6 +1,5 @@
 include 'fixed-issuer'
 include 'self-register-user-configure'
-include 'account-management'
 include 'theme'
 include 'build'
 

@@ -28,7 +28,6 @@ ENV KC_HTTP_RELATIVE_PATH=/auth
 ADD --chown=keycloak:keycloak build/image/openremote-theme-provider.jar /opt/keycloak/providers
 ADD --chown=keycloak:keycloak build/image/openremote-issuer-provider.jar /opt/keycloak/providers
 ADD --chown=keycloak:keycloak build/image/openremote-self-register-configure-event-listener.jar /opt/keycloak/providers
-ADD --chown=keycloak:keycloak build/image/openremote-account-management.jar /opt/keycloak/providers
 
 WORKDIR /opt/keycloak
 
