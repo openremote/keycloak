@@ -2,7 +2,7 @@
 # Keycloak image built for postgresql support with theme handling customisation
 # to always fallback to standard openremote theme.
 # ------------------------------------------------------------------------------------
-ARG VERSION=26.0
+ARG VERSION=26.3
 FROM registry.access.redhat.com/ubi9 AS ubi-micro-build
 MAINTAINER support@openremote.io
 
@@ -11,7 +11,7 @@ RUN dnf install --installroot /mnt/rootfs curl --releasever 9 --setopt install_w
     dnf --installroot /mnt/rootfs clean all && \
     rpm --root /mnt/rootfs -e --nodeps setup
 
-FROM quay.io/keycloak/keycloak:${VERSION} AS builder
+FROM keycloak/keycloak:${VERSION} AS builder
 
 # Add git commit label must be specified at build time using --build-arg GIT_COMMIT=dadadadadad
 ARG GIT_COMMIT=unknown
@@ -34,7 +34,7 @@ WORKDIR /opt/keycloak
 # Build custom image and copy into this new image
 RUN /opt/keycloak/bin/kc.sh build --spi-initializer-provider=issuer
 
-FROM quay.io/keycloak/keycloak:${VERSION}
+FROM keycloak/keycloak:${VERSION}
 
 # Copy custom build
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
