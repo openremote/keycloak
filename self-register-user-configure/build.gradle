@@ -2,6 +2,10 @@ plugins {
     id 'java'
 }
 
+base {
+    archivesName = "openremote-self-register-configure-event-listener"
+}
+
 configurations {
     jarLibs
 }
@@ -19,7 +23,6 @@ dependencies {
 }
 
 jar {
-    archivesBaseName = "openremote-self-register-configure-event-listener"
     from {
         configurations.jarLibs.collect {
             zipTree(it)
