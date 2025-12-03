@@ -1,5 +1,5 @@
 <#import "template.ftl" as layout>
-<@layout.registrationLayout displayMessage=!messagesPerField.existsError('password-old','password','password-confirm'); section>
+<@layout.registrationLayout displayMessage=!messagesPerField.existsError('password','password-confirm'); section>
     <#if section = "header">
         ${msg("updatePasswordTitle")}
     <#elseif section = "form">
@@ -7,18 +7,7 @@
             <div class="row">
                 <input type="text" id="username" name="username" value="${username}" autocomplete="username"
                        readonly="readonly" style="display:none;"/>
-                <div class="input-field col s12">
-                    <input type="password" id="password-old" name="password-old"
-                           class="validate <#if messagesPerField.existsError('password-old')>invalid</#if>"
-                           required
-                           autofocus autocomplete="new-password"
-                           aria-invalid="<#if messagesPerField.existsError('password-old')>true</#if>"
-                    />
-                    <label for="password-old" class="${properties.kcLabelClass!}">${msg("passwordOld")}</label>
-                    <#if messagesPerField.existsError('password-old')>
-                        <span class="helper-text" data-error="${kcSanitize(messagesPerField.getFirstError('password-old'))?no_esc}"></span>
-                    </#if>
-                </div>
+                <input type="password" id="password" name="password" autocomplete="current-password" style="display:none;"/>
 
                 <div class="input-field col s12">
                     <input type="password" id="password-new" name="password-new"
