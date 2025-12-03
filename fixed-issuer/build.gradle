@@ -2,6 +2,10 @@ plugins {
     id 'java'
 }
 
+base {
+    archivesName = "openremote-issuer-provider"
+}
+
 configurations {
     jarLibs
 }
@@ -24,7 +28,6 @@ dependencies {
 }
 
 jar {
-    archivesBaseName = "openremote-issuer-provider"
     from {
         configurations.jarLibs.collect {
             zipTree(it)
