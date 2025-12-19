@@ -97,8 +97,8 @@ i.material-icons {
     font-feature-settings: 'liga';
 }
 
-.input-field >label {
-    color: var(--app-primary-color);
+.input-field > label {
+    color: var(--app-primary-color) !important;
 }
 
 .input-field > input {
