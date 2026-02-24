@@ -1,7 +1,6 @@
 <#import "template.ftl" as layout>
 <@layout.mainLayout active='social'; section>
 
-
     <h4>${msg("federatedIdentitiesHtmlTitle")}</h4>
 
     <div class="section">
