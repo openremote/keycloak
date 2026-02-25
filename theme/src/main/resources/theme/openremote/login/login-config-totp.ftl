@@ -1,9 +1,12 @@
 <#import "template.ftl" as layout>
+
 <@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp'); section>
+
   <#if section = "header">
     ${msg("loginTotpTitle")}
   <#elseif section = "form">
     <ol id="kc-totp-settings">
+
       <li>
         <p>${msg("loginTotpStep1")}</p>
         <ul id="kc-totp-supported-apps">
@@ -46,8 +49,10 @@
         <p>${msg("loginTotpStep3DeviceName")}</p>
       </li>
     </ol>
+
     <form action="${url.loginAction}" class=" ${properties.kcFormClass!}" id="kc-totp-settings-form" method="post">
-      <div class="${properties.kcFormGroupClass!}">
+
+      <div style="margin-top: 24px;" class="${properties.kcFormGroupClass!}">
         <div class="input-field ${properties.kcLabelWrapperClass!}">
           <input type="text" id="totp" name="totp" autocomplete="one-time-code" class="validate <#if messagesPerField.existsError('totp')>invalid</#if> ${properties.kcInputClass!}" aria-invalid="<#if messagesPerField.existsError('totp')>true</#if>" inputmode="numeric" dir="ltr"/>
           <label for="totp" class="${properties.kcLabelClass!}">${msg("authenticatorCode")}</label>
@@ -58,6 +63,7 @@
         <input type="hidden" id="totpSecret" name="totpSecret" value="${totp.totpSecret}" />
         <#if mode??><input type="hidden" id="mode" name="mode" value="${mode}"/></#if>
       </div>
+
       <div class="${properties.kcFormGroupClass!}">
         <div class="input-field ${properties.kcLabelWrapperClass!}">
           <input type="text" class="validate <#if messagesPerField.existsError('totp')>invalid</#if> ${properties.kcInputClass!}" id="userLabel" name="userLabel" autocomplete="off" aria-invalid="<#if messagesPerField.existsError('userLabel')>true</#if>" dir="ltr"/>
@@ -67,6 +73,7 @@
           </#if>
         </div>
       </div>
+
       <div class="${properties.kcFormGroupClass!}">
         <div id="kc-form-buttons" class="col s12 center-align ${properties.kcFormButtonsClass!}">
           <button type="submit" class="btn waves-effect waves-light" id="saveTOTPBtn">${msg("doSubmit")}
@@ -77,6 +84,7 @@
           </button>
         </div>
       </div>
+
     </form>
   </#if>
 </@layout.registrationLayout>
