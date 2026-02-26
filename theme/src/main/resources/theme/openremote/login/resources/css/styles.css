@@ -135,6 +135,11 @@ i.material-icons {
     opacity: 1;
 }
 
+[type="radio"]:checked + span:after {
+  background-color: var(--app-primary-color);
+  border-color: var(--app-primary-color);
+}
+
 hr {
     margin: 40px 0;
 }
