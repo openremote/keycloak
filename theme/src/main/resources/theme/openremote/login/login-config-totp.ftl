@@ -66,7 +66,7 @@
 
       <div class="${properties.kcFormGroupClass!}">
         <div class="input-field ${properties.kcLabelWrapperClass!}">
-          <input type="text" class="validate <#if messagesPerField.existsError('totp')>invalid</#if> ${properties.kcInputClass!}" id="userLabel" name="userLabel" autocomplete="off" aria-invalid="<#if messagesPerField.existsError('userLabel')>true</#if>" dir="ltr"/>
+          <input type="text" class="validate <#if messagesPerField.existsError('userLabel')>invalid</#if> ${properties.kcInputClass!}" id="userLabel" name="userLabel" autocomplete="off" aria-invalid="<#if messagesPerField.existsError('userLabel')>true</#if>" dir="ltr"/>
           <label for="userLabel" class="${properties.kcLabelClass!}">${msg("loginTotpDeviceName")}</label>
           <#if messagesPerField.existsError('userLabel')>
             <span class="helper-text" data-error="${kcSanitize(messagesPerField.getFirstError('userLabel'))?no_esc}"></span>

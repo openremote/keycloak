@@ -10,20 +10,13 @@
       <#if otpLogin.userOtpCredentials?size gt 1>
         <div class="${properties.kcFormGroupClass!}">
           <div class="${properties.kcInputWrapperClass!}">
-            <label>${msg("select2faDevice", "Select your 2FA device")}</label>
+            <label class="${properties.kcLabelClass!}">${msg("select2faDevice", "Select your 2FA device")}</label>
             <div id="kc-otp-credential-box">
               <#list otpLogin.userOtpCredentials as otpCredential>
-                <div>
-                  <input id="kc-otp-credential-${otpCredential?index}" class="${properties.kcLoginOTPListInputClass!}" type="radio" name="selectedCredentialId" value="${otpCredential.id}" <#if otpCredential.id == otpLogin.selectedCredentialId>checked="checked"</#if>>
-                  <label for="kc-otp-credential-${otpCredential?index}" class="${properties.kcLoginOTPListClass!}" tabindex="${otpCredential?index}">
-                    <span class="${properties.kcLoginOTPListItemHeaderClass!}">
-                      <span class="${properties.kcLoginOTPListItemIconBodyClass!}">
-                        <i class="${properties.kcLoginOTPListItemIconClass!}" aria-hidden="true"></i>
-                      </span>
-                      <span class="${properties.kcLoginOTPListItemTitleClass!}">${otpCredential.userLabel}</span>
-                    </span>
-                  </label>
-                </div>
+                <label>
+                  <input style="display: none" id="kc-otp-credential-${otpCredential?index}" class="${properties.kcLoginOTPListInputClass!}" name="selectedCredentialId" type="radio" tabindex="${otpCredential?index}" value="${otpCredential.id}" <#if otpCredential.id == otpLogin.selectedCredentialId>checked="checked"</#if>>
+                  <span>${otpCredential.userLabel}</span>
+                </label>
               </#list>
             </div>
           </div>
@@ -32,7 +25,7 @@
 
       <div class="${properties.kcFormGroupClass!}" style="margin-top: 24px;">
         <div class="input-field ${properties.kcLabelWrapperClass!}">
-          <input id="otp" name="otp" autocomplete="off" type="text" class="validate <#if messagesPerField.existsError('totp')>invalid</#if> ${properties.kcInputClass!}" autofocus aria-invalid="<#if messagesPerField.existsError('totp')>true</#if>" dir="ltr" />
+          <input id="otp" name="otp" autocomplete="one-time-code" inputmode="numeric" type="text" class="validate <#if messagesPerField.existsError('totp')>invalid</#if> ${properties.kcInputClass!}" autofocus aria-invalid="<#if messagesPerField.existsError('totp')>true</#if>" dir="ltr" />
           <label for="otp" class="${properties.kcLabelClass!}">${msg("loginOtpOneTime")}</label>
           <#if messagesPerField.existsError('totp')>
             <span class="helper-text" data-error="${kcSanitize(messagesPerField.getFirstError('totp'))?no_esc}"></span>
