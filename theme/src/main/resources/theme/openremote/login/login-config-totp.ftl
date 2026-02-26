@@ -1,6 +1,6 @@
 <#import "template.ftl" as layout>
 
-<@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp'); section>
+<@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp', 'userLabel'); section>
 
   <#if section = "header">
     ${msg("loginTotpTitle")}
