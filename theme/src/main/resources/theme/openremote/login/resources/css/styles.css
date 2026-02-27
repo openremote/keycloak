@@ -136,8 +136,8 @@ i.material-icons {
 }
 
 [type="radio"]:checked + span:after {
-  background-color: var(--app-primary-color);
-  border-color: var(--app-primary-color);
+    background-color: var(--app-primary-color);
+    border-color: var(--app-primary-color);
 }
 
 hr {
