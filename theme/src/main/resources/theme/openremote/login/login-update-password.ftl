@@ -58,7 +58,7 @@
                             <button class="btn waves-effect waves-light" type="submit">${msg("doSubmit")}
                                 <i class="material-icons right">send</i>
                             </button>
-                            <button class="btn waves-effect waves-light" type="submit" name="cancel-aia" value="true" />${msg("doCancel")}</button>
+                            <button class="btn waves-effect waves-light" type="submit" name="cancel-aia" value="true">${msg("doCancel")}</button>
                         <#else>
                             <button class="btn waves-effect waves-light" type="submit">${msg("doSubmit")}
                                 <i class="material-icons right">send</i>

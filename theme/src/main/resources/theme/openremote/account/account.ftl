@@ -55,7 +55,7 @@
 
             <#if url.referrerURI??>
                 <div class="col s12 center-align">
-                    <p><a href="${url.referrerURI}">${msg("backToApplication")}/a></p>
+                    <p><a href="${url.referrerURI}">${msg("backToApplication")}</a></p>
                 </div>
             </#if>
         </form>
