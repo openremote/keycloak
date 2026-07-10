@@ -15,6 +15,10 @@ on:
     paths-ignore:
       - '**/*.md'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
 
   image_keycloak:
@@ -25,10 +29,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: styfle/cancel-workflow-action@3d86a7cc43670094ac248017207be0295edbc31d # 0.8.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Set tags
         id: set-tags
         run: |

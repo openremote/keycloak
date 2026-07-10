@@ -6,6 +6,12 @@
         ${kcSanitize(msg("loginTitleHtml",(realm.displayNameHtml!'')))?no_esc}
     <#elseif section = "form">
         <#if realm.password>
+
+        <#if social.providers??>
+            <hr/>
+            <h4>${msg("localLoginLabel")}</h4>
+        </#if>
+
         <form onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
             <div class="row">
                 <div class="input-field col s12">
@@ -78,29 +84,22 @@
         </form>
         </#if>
     <#elseif section = "info" >
-
         <#if realm.password && realm.registrationAllowed && !usernameEditDisabled??>
             <div id="kc-registration">
                 <span>${msg("noAccount")} <a href="${url.registrationUrl}">${msg("doRegister")}</a></span>
             </div>
         </#if>
-
-
+    <#elseif section = "socialProviders" >
         <#if realm.password && social.providers??>
-            <div id="kc-social-providers">
-                <ul>
+            <div id="kc-social-providers" class="${properties.kcFormSocialAccountSectionClass!}">
+                <h4>${msg("identityProviderLoginLabel")}</h4>
+                <div class="button-container">
                     <#list social.providers as p>
-                        <a id="social-${p.alias}" class="${properties.kcFormSocialAccountListButtonClass!} <#if social.providers?size gt 3>${properties.kcFormSocialAccountGridItem!}</#if>"
-                           type="button" href="${p.loginUrl}">
-                            <#if p.iconClasses?has_content>
-                                <i class="${properties.kcCommonLogoIdP!} ${p.iconClasses!}" aria-hidden="true"></i>
-                                <span class="${properties.kcFormSocialAccountNameClass!} kc-social-icon-text">${p.displayName!}</span>
-                            <#else>
-                                <span class="${properties.kcFormSocialAccountNameClass!}">${p.displayName!}</span>
-                            </#if>
-                        </a>
+                        <form action="${p.loginUrl}" method="post">
+                            <button class="btn waves-effect waves-light">${p.displayName}</button>
+                        </form>
                     </#list>
-                </ul>
+                </div>
             </div>
         </#if>
     </#if>

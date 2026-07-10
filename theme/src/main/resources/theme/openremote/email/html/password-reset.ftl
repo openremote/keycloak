@@ -116,7 +116,7 @@
 																		<table border="0" cellpadding="0" cellspacing="0" width="420" style="max-width: 100%;">
 																			<tr>
 																				<td align="center" class="textContent">
-																					<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:15px;margin-bottom:0;color:#5F5F5F;line-height:135%;">Someone just requested to change your ${(realmName!'')} account''s credentials. If this was you, click on the link below to reset them.</div>
+																					<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:15px;margin-bottom:0;color:#5F5F5F;line-height:135%;">Someone just requested to change your ${(realmName!'')} account's credentials. If this was you, click on the link below to reset them.</div>
 																				</td>
 																			</tr>
 																		</table>
@@ -170,7 +170,7 @@
 																		<table border="0" cellpadding="0" cellspacing="0" width="420" style="max-width: 100%;">
 																			<tr>
 																				<td align="center" class="textContent">
-																					<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:15px;margin-bottom:0;color:#5F5F5F;line-height:135%;">This link will expire within ${(linkExpiration!'')} minutes.If you don''t want to reset your credentials, just ignore this message and nothing will be changed.</div>
+																					<div style="text-align:center;font-family:Helvetica,Arial,sans-serif;font-size:15px;margin-bottom:0;color:#5F5F5F;line-height:135%;">This link will expire within ${(linkExpiration!'')} minutes. If you don't want to reset your credentials, just ignore this message and nothing will be changed.</div>
 																				</td>
 																			</tr>
 																		</table>

@@ -76,6 +76,9 @@
                     </#if>
 
                     <div class="col s12">
+                        <#nested "socialProviders">
+                    </div>
+                     <div class="col s12">
                         <#nested "form">
                     </div>
                 </div>

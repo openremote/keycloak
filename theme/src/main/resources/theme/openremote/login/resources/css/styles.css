@@ -97,8 +97,8 @@ i.material-icons {
     font-feature-settings: 'liga';
 }
 
-.input-field >label {
-    color: var(--app-primary-color);
+.input-field > label {
+    color: var(--app-primary-color) !important;
 }
 
 .input-field > input {
@@ -133,4 +133,21 @@ i.material-icons {
 [type="radio"]:not(:checked), [type="radio"]:checked {
     position: relative;
     opacity: 1;
+}
+
+[type="radio"]:checked + span:after {
+    background-color: var(--app-primary-color);
+    border-color: var(--app-primary-color);
+}
+
+hr {
+    margin: 40px 0;
+}
+
+.button-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
 }
