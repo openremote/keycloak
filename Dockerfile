@@ -2,8 +2,8 @@
 # Keycloak image built for postgresql support with theme handling customisation
 # to always fallback to standard openremote theme.
 # ------------------------------------------------------------------------------------
-ARG VERSION=26.3
-FROM registry.access.redhat.com/ubi9 AS ubi-micro-build
+ARG VERSION=26.6
+FROM registry.access.redhat.com/ubi10/openjdk-21-runtime:1.24-5 AS ubi-micro-build
 MAINTAINER support@openremote.io
 
 RUN mkdir -p /mnt/rootfs
