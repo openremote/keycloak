@@ -70,7 +70,7 @@ ENV KEYCLOAK_ACCOUNT_THEME=openremote
 ENV KEYCLOAK_WELCOME_THEME=keycloak
 ENV KEYCLOAK_SELF_REGISTERED_USER_ROLES="{ }"
 
-HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl --head -fsS http://localhost:8080/auth/health/ready || exit 1
+HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl --head -fsS http://localhost:9000/auth/health/ready || exit 1
 
 EXPOSE 8080
 
