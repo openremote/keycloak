@@ -3,6 +3,13 @@
 # to always fallback to standard openremote theme.
 # ------------------------------------------------------------------------------------
 ARG VERSION=26.7.0
+
+ARG KC_HEALTH_ENABLED=true
+ARG KC_METRICS_ENABLED=true
+ARG KC_FEATURES=token-exchange
+ARG KC_DB=postgres
+ARG KC_HTTP_RELATIVE_PATH=/auth
+
 FROM registry.access.redhat.com/ubi9 AS ubi-micro-build
 LABEL maintainer="support@openremote.io"
 
@@ -18,11 +25,16 @@ ARG GIT_COMMIT=unknown
 LABEL git-commit=$GIT_COMMIT
 
 # Configure build options
-ENV KC_HEALTH_ENABLED=true
-ENV KC_METRICS_ENABLED=true
-ENV KC_FEATURES=token-exchange
-ENV KC_DB=postgres
-ENV KC_HTTP_RELATIVE_PATH=/auth
+ARG KC_HEALTH_ENABLED
+ARG KC_METRICS_ENABLED
+ARG KC_FEATURES
+ARG KC_DB
+ARG KC_HTTP_RELATIVE_PATH
+ENV KC_HEALTH_ENABLED=$KC_HEALTH_ENABLED
+ENV KC_METRICS_ENABLED=$KC_METRICS_ENABLED
+ENV KC_FEATURES=$KC_FEATURES
+ENV KC_DB=$KC_DB
+ENV KC_HTTP_RELATIVE_PATH=$KC_HTTP_RELATIVE_PATH
 
 # Install custom providers
 COPY --chown=keycloak:keycloak build/image/openremote-theme-provider.jar /opt/keycloak/providers
@@ -35,6 +47,18 @@ WORKDIR /opt/keycloak
 RUN /opt/keycloak/bin/kc.sh build --spi-initializer-provider=issuer
 
 FROM keycloak/keycloak:${VERSION}
+
+# Reinstate build args in case starting in dev mode
+ARG KC_HEALTH_ENABLED
+ARG KC_METRICS_ENABLED
+ARG KC_FEATURES
+ARG KC_DB
+ARG KC_HTTP_RELATIVE_PATH
+ENV KC_HEALTH_ENABLED=$KC_HEALTH_ENABLED
+ENV KC_METRICS_ENABLED=$KC_METRICS_ENABLED
+ENV KC_FEATURES=$KC_FEATURES
+ENV KC_DB=$KC_DB
+ENV KC_HTTP_RELATIVE_PATH=$KC_HTTP_RELATIVE_PATH
 
 # Copy custom build
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
@@ -65,13 +89,10 @@ ENV KC_PROXY_HEADERS=xforwarded
 ENV KC_LOG_LEVEL=info
 ENV KC_BOOTSTRAP_ADMIN_USERNAME=admin
 ENV KC_BOOTSTRAP_ADMIN_PASSWORD=secret
-ENV KEYCLOAK_DEFAULT_THEME=openremote
-ENV KEYCLOAK_ACCOUNT_THEME=openremote
-ENV KEYCLOAK_WELCOME_THEME=keycloak
 ENV KEYCLOAK_SELF_REGISTERED_USER_ROLES="{ }"
 
 HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl --head -fsS http://localhost:9000/auth/health/ready || exit 1
 
 EXPOSE 8080
 
-ENTRYPOINT exec /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start --optimized} --spi-initializer-issuer-base-uri=${KEYCLOAK_ISSUER_BASE_URI:-} --spi-events-listener-self-register-user-configure-self-registered-user-roles="${KEYCLOAK_SELF_REGISTERED_USER_ROLES:-}" --spi-theme-login-default=${KEYCLOAK_LOGIN_THEME:-openremote} --spi-theme-welcome-theme=${KEYCLOAK_WELCOME_THEME:-keycloak} --spi-theme-admin-theme=${KEYCLOAK_ADMIN_THEME:-keycloak} ${KEYCLOAK_START_OPTS:-}
+ENTRYPOINT exec /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start --optimized} --spi-initializer-issuer-base-uri=${KEYCLOAK_ISSUER_BASE_URI:-} --spi-events-listener-self-register-user-configure-self-registered-user-roles="${KEYCLOAK_SELF_REGISTERED_USER_ROLES:-}" ${KEYCLOAK_START_OPTS:-}

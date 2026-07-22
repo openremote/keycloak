@@ -10,7 +10,7 @@ Keycloak docker image built for `postgres` with:
 this is to allow a private deployment to be accessed over a reverse tunnel, when using this you also need to set the following but precaution should be taken to validate the `Host` header in the reverse proxy:
   * `KC_HOSTNAME: `
   * `KC_HOSTNAME_STRICT: false`
-* OpenRemote theme embedded and set as default
+* OpenRemote theme embedded and set as default (login and email templates only)
 * Request path to `/auth` (like older versions of Keycloak to simplify usage behind a reverse proxy)
 * Listener to configure roles of self-registered users. Roles are set using `KEYCLOAK_SELF_REGISTERED_USER_ROLES` environment variable,  
 the JSON structure is
@@ -36,10 +36,10 @@ The listener is not enabled by default. In Keycloak, in the `Realm settings` - `
 The openremote theme template files are located in `src/main/resources/theme/openremote`; to work on the OpenRemote theme use (ensure you are in the repo root dir first):
 
 ```shell
-docker run --rm -p 8081:8080 -e KEYCLOAK_DEFAULT_THEME=dev -e KC_HOSTNAME_PORT=8081 -e KEYCLOAK_START_COMMAND=start-dev -e KEYCLOAK_START_OPTS="--spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false" --mount type=bind,src=$PWD/theme/src/main/resources/theme/openremote,dst=/deployment/keycloak/themes/dev openremote/keycloak:latest
+docker run --rm -p 8081:8080 -e KC_HOSTNAME_PORT=8081 -e KEYCLOAK_START_COMMAND=start-dev -e KEYCLOAK_START_OPTS="--spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false" --mount type=bind,src=$PWD/theme/src/main/resources/theme/openremote,dst=/deployment/keycloak/themes/dev openremote/keycloak:latest
 ```
 
-Then access http://localhost:8081/ and any changes made to the template files can be reloaded in realtime by just refreshing the window.
+Then access http://localhost:8081/auth/ then change the template used for a realm to the `dev` template then try and login to that realm via http://localhost:8081/auth/admin/REALM_NAME/console and any changes made to the template files can be reloaded in realtime by just refreshing the window.
 
 To get the standard themes for reference use the following (replace `${VERSION}` with actual keycloak version used):
 ```shell
