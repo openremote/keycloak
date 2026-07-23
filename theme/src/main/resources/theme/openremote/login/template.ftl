@@ -37,7 +37,7 @@
                                         <path fill="#1D5632" d="M11.936,16.622c-0.082,0-0.164-0.001-0.245-0.004c-1.29-0.065-2.478-0.628-3.346-1.585 c-0.868-0.958-1.31-2.195-1.246-3.487l2.104,0.105c-0.036,0.728,0.214,1.427,0.704,1.967c0.488,0.54,1.16,0.858,1.888,0.894 c0.725,0.033,1.426-0.213,1.966-0.703c0.541-0.489,0.858-1.159,0.895-1.887c0.075-1.503-1.088-2.787-2.591-2.862l0.105-2.104 c2.664,0.132,4.724,2.406,4.592,5.07c-0.064,1.291-0.628,2.478-1.585,3.345C14.28,16.183,13.137,16.622,11.936,16.622L11.936,16.622 z"/>
                                     </svg>
                                 </a>
-                                <div class="left-align">
+                                <div class="left-align" style="display: flex; flex-direction: column; justify-content: center;">
                                     <h5 id="header" style="margin: 0 0 5px 0;"><#nested "header"></h5>
                                     <p id="sub-header" style="margin: 0; line-height: 1.2;">${msg("applicationName")}</p>
                                 </div>
@@ -54,9 +54,11 @@
                                         <button tabindex="1" id="kc-current-locale-link"
                                                 class="dropdown-trigger btn btn-small"
                                                 data-target="language-switch1"
-                                                aria-label="${msg("languages")}">
-                                            ${locale.current}
-                                            <i class="material-icons right" style="margin-left: 5px;">arrow_drop_down</i>
+                                                aria-label="${msg("languages")}"
+                                                style="display: inline-flex; align-items: center; justify-content: center;">
+                                            <span>${locale.current}</span>
+                                            <!-- Explicitly reset the margin-right from styles.css so it centers properly -->
+                                            <i class="material-icons" style="margin: 0 0 0 5px;">arrow_drop_down</i>
                                         </button>
 
                                         <!-- 2. Materialize Dropdown Content -->
