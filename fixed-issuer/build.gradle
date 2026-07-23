@@ -35,8 +35,7 @@ jar {
     }
 }
 
-task installDist(type: Copy) {
+tasks.register('installDist', Copy) {
     into "${rootDir}/build/image"
-
     from jar.outputs
 }

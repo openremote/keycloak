@@ -7,7 +7,7 @@
     <#elseif section = "form">
         <#if realm.password>
 
-        <#if social.providers??>
+        <#if realm.password && social?? && social.providers?has_content>
             <hr/>
             <h4>${msg("localLoginLabel")}</h4>
         </#if>
@@ -90,7 +90,7 @@
             </div>
         </#if>
     <#elseif section = "socialProviders" >
-        <#if realm.password && social.providers??>
+        <#if realm.password && social?? && social.providers?has_content>
             <div id="kc-social-providers" class="${properties.kcFormSocialAccountSectionClass!}">
                 <h4>${msg("identityProviderLoginLabel")}</h4>
                 <div class="button-container">
