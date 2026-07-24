@@ -1,0 +1,19 @@
+[versions]
+autoService = "1.1.1"
+byteBuddy = "1.17.5"
+jbossLogging = "3.6.1.Final"
+keycloak = "26.6.4"
+lombok = "1.18.38"
+slf4j = "2.0.17"
+
+[libraries]
+autoService = { module = "com.google.auto.service:auto-service", version.ref = "autoService" }
+byteBuddy = { module = "net.bytebuddy:byte-buddy", version.ref = "byteBuddy" }
+byteBuddyAgent = { module = "net.bytebuddy:byte-buddy-agent", version.ref = "byteBuddy" }
+jbossLogging = { module = "org.jboss.logging:jboss-logging", version.ref = "jbossLogging" }
+keycloakCore = { module = "org.keycloak:keycloak-core", version.ref = "keycloak" }
+keycloakServerSpi = { module = "org.keycloak:keycloak-server-spi", version.ref = "keycloak" }
+keycloakServerSpiPrivate = { module = "org.keycloak:keycloak-server-spi-private", version.ref = "keycloak" }
+keycloakServices = { module = "org.keycloak:keycloak-services", version.ref = "keycloak" }
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+slf4jApi = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
