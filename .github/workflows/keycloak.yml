@@ -15,6 +15,13 @@ on:
     paths-ignore:
       - '**/*.md'
 
+  # Validate pull requests without publishing
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
