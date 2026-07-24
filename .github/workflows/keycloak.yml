@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set tags
+      - name: Set tagss
         id: set-tags
         run: |
           if [ -z "$TAG" ]; then
