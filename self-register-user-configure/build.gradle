@@ -15,10 +15,10 @@ repositories {
 }
 
 dependencies {
-    implementation "org.keycloak:keycloak-server-spi:$keycloakVersion"
-    implementation "org.keycloak:keycloak-server-spi-private:$keycloakVersion"
-    implementation "org.keycloak:keycloak-core:$keycloakVersion"
-    implementation "org.jboss.logging:jboss-logging:$jbossLoggingVersion"
+    implementation libs.keycloakServerSpi
+    implementation libs.keycloakServerSpiPrivate
+    implementation libs.keycloakCore
+    implementation libs.jbossLogging
 }
 
 jar {
@@ -35,5 +35,5 @@ tasks.register('installDist', Copy) {
 }
 
 tasks.withType(JavaCompile).configureEach {
-    options.release = 17
+    options.release = 21
 }
