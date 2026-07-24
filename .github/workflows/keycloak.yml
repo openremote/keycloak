@@ -81,7 +81,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/aarch64
           load: true
-          push: true
+          push: false
           tags: ${{ steps.set-tags.outputs.keycloakDockerImage }}
           build-args: |
             GIT_COMMIT=${{ github.sha }}
