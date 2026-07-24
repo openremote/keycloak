@@ -1,4 +1,4 @@
-name: Docker Image
+name: CI/CD
 
 # Controls when the action will run. 
 on:
@@ -21,11 +21,8 @@ concurrency:
 
 jobs:
 
-  image_keycloak:
-
-    env:
-      PLATFORM: linux/amd64,linux/arm64
-
+  build:
+    name: CI/CD
     runs-on: ubuntu-latest
 
     steps:
@@ -42,55 +39,60 @@ jobs:
         env:
           TAG: ${{ github.event.release.tag_name }}
 
-      - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: set up JDK 17
-        uses: actions/setup-java@b6e674f4b717d7b0ae3baee0fbe79f498905dfde # v1
+      - name: Set up JDK 17 and gradle cache
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
         with:
-          java-version: 17
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
 
-      - name: grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Build with Gradle
+        run: |
+          ./gradlew installDist
 
-      - name: build with Gradle
-        run: ./gradlew installDist
-
-      - name: set up QEMU
-        uses: docker/setup-qemu-action@27d0a4f181a40b142cce983c5393082c365d1480 # v1
+      - name: Install QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
         with:
-          platforms: all
+          platforms: linux/amd64,linux/aarch64
 
-      - name: install buildx
-        id: buildx
-        uses: docker/setup-buildx-action@f211e3e9ded2d9377c8cadc4489a4e38014bc4c9 # v1
-        with:
-          version: latest
-          install: true
-
-      - name: available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
+      - name: Install Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Login to DockerHub
-        uses: docker/login-action@dd4fa0671be5250ee6f50aedf4cb05514abda2c7 # v1
+        uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4.5.0
         with:
           username: ${{ secrets._TEMP_DOCKERHUB_USER }}
           password: ${{ secrets._TEMP_DOCKERHUB_PASSWORD }}
 
-      - name: build and push images
-        run: |
-          docker build --build-arg GIT_COMMIT=${{ github.sha }} --push --platform $PLATFORM $TAG .
+      - name: Build multi-platform Keycloak image
+        timeout-minutes: 20
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/aarch64
+          load: true
+          push: true
+          tags: ${{ steps.set-tags.outputs.keycloakDockerImage }}
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+        env:
+          DOCKER_BUILD_SUMMARY: false
+          DOCKER_BUILD_RECORD_UPLOAD: false
 
-      - name: Scan keycloak docker image
-        uses: anchore/scan-action@3343887d815d7b07465f6fdcd395bd66508d486a # v3
+      - name: Scan Keycloak Docker image
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         id: keycloak-anchore-scan
         with:
           image: ${{ steps.set-tags.outputs.keycloakDockerImage }}
-          fail-build: false
+          fail-build: true
           severity-cutoff: critical
 
       - name: Upload Anchore scan SARIF report
         if: ${{ !cancelled() }}
-        uses: github/codeql-action/upload-sarif@e488e3c8239c26bf8e6704904a8cb59be658d450 # v3
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           sarif_file: ${{ steps.keycloak-anchore-scan.outputs.sarif }}
 
