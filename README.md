@@ -29,7 +29,7 @@ This can be done e.g. by piping to `jq -c | sed 's/"/\\"/g'`, which would result
 The listener is not enabled by default. In Keycloak, in the `Realm settings` - `Events` - `Event listeners` admin screen, `self-register-user-configure` should be added to the list.
 
 ## Working on the OpenRemote theme
-The openremote theme template files are located in `src/main/resources/theme/openremote`; to work on the OpenRemote theme use (ensure you are in the repo root dir first and change port as required):
+The OpenRemote theme template files are located in `theme/src/main/resources/theme/openremote`; to work on the OpenRemote theme use (ensure you are in the repo root dir first and change port as required):
 
 ```shell
 docker run --rm -p 8081:8080 -e KC_DB="dev-mem" -e KC_HOSTNAME="localhost" -e KEYCLOAK_START_OPTS="--spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false" --mount type=bind,src=$PWD/theme/src/main/resources/theme/openremote,dst=/deployment/keycloak/themes/dev openremote/keycloak:develop
