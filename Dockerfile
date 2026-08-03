@@ -6,7 +6,6 @@ ARG VERSION=26.7.0
 
 ARG KC_HEALTH_ENABLED=true
 ARG KC_METRICS_ENABLED=true
-ARG KC_FEATURES=token-exchange
 ARG KC_DB=postgres
 ARG KC_HTTP_RELATIVE_PATH=/auth
 
@@ -27,36 +26,31 @@ LABEL git-commit=$GIT_COMMIT
 # Configure build options
 ARG KC_HEALTH_ENABLED
 ARG KC_METRICS_ENABLED
-ARG KC_FEATURES
 ARG KC_DB
 ARG KC_HTTP_RELATIVE_PATH
 ENV KC_HEALTH_ENABLED=$KC_HEALTH_ENABLED
 ENV KC_METRICS_ENABLED=$KC_METRICS_ENABLED
-ENV KC_FEATURES=$KC_FEATURES
 ENV KC_DB=$KC_DB
 ENV KC_HTTP_RELATIVE_PATH=$KC_HTTP_RELATIVE_PATH
 
 # Install custom providers
 COPY --chown=keycloak:keycloak build/image/openremote-theme-provider.jar /opt/keycloak/providers
-COPY --chown=keycloak:keycloak build/image/openremote-issuer-provider.jar /opt/keycloak/providers
 COPY --chown=keycloak:keycloak build/image/openremote-self-register-configure-event-listener.jar /opt/keycloak/providers
 
 WORKDIR /opt/keycloak
 
 # Build custom image and copy into this new image
-RUN /opt/keycloak/bin/kc.sh build --spi-initializer-provider=issuer
+RUN /opt/keycloak/bin/kc.sh build
 
 FROM keycloak/keycloak:${VERSION}
 
 # Reinstate build args in case starting in dev mode
 ARG KC_HEALTH_ENABLED
 ARG KC_METRICS_ENABLED
-ARG KC_FEATURES
 ARG KC_DB
 ARG KC_HTTP_RELATIVE_PATH
 ENV KC_HEALTH_ENABLED=$KC_HEALTH_ENABLED
 ENV KC_METRICS_ENABLED=$KC_METRICS_ENABLED
-ENV KC_FEATURES=$KC_FEATURES
 ENV KC_DB=$KC_DB
 ENV KC_HTTP_RELATIVE_PATH=$KC_HTTP_RELATIVE_PATH
 
@@ -95,4 +89,4 @@ HEALTHCHECK --interval=3s --timeout=3s --start-period=30s --retries=120 CMD curl
 
 EXPOSE 8080
 
-ENTRYPOINT exec /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start --optimized} --spi-initializer-issuer-base-uri=${KEYCLOAK_ISSUER_BASE_URI:-} --spi-events-listener-self-register-user-configure-self-registered-user-roles="${KEYCLOAK_SELF_REGISTERED_USER_ROLES:-}" ${KEYCLOAK_START_OPTS:-}
+ENTRYPOINT exec /opt/keycloak/bin/kc.sh ${KEYCLOAK_START_COMMAND:-start} --spi-events-listener-self-register-user-configure-self-registered-user-roles="${KEYCLOAK_SELF_REGISTERED_USER_ROLES:-}" ${KEYCLOAK_START_OPTS:-}
