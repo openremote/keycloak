@@ -1,105 +1,53 @@
 <#import "template.ftl" as layout>
+<#import "field.ftl" as field>
 <@layout.registrationLayout displayMessage=!messagesPerField.existsError('username','password') displayInfo=realm.password && realm.registrationAllowed && !registrationDisabled??; section>
-    <#if section = "title">
-        ${msg("loginTitle",(realm.displayName!''))}
-    <#elseif section = "header">
-        ${kcSanitize(msg("loginTitleHtml",(realm.displayNameHtml!'')))?no_esc}
+    <#if section = "header">
+        ${msg("loginAccountTitle")}
     <#elseif section = "form">
         <#if realm.password>
+            <#-- Double-submit protection is applied generically by forms.js; doing it here
+                 with onsubmit would disable the submitter before its name/value is collected. -->
+            <form id="kc-form-login" action="${url.loginAction}" method="post">
 
-        <#if realm.password && social?? && social.providers?has_content>
-            <hr/>
-            <h4>${msg("localLoginLabel")}</h4>
-        </#if>
+                <@field.input name="username"
+                              label=(!realm.loginWithEmailAllowed)?then(msg("username"), (!realm.registrationEmailAsUsername)?then(msg("usernameOrEmail"), msg("email")))
+                              value=(login.username!'')
+                              autofocus=true
+                              disabled=usernameEditDisabled??
+                              autocomplete="username"
+                              errors=["username", "password"]
+                              attrs='autocapitalize="off" minlength="1"'/>
 
-        <form onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post">
-            <div class="row">
-                <div class="input-field col s12">
-                    <#if usernameEditDisabled??>
-                        <input id="username"
-                               autofocus
-                               autocomplete="off"
-                               autocapitalize="off"
-                               name="username" value="${(login.username!'')}" type="text" disabled/>
-                    <#else>
-                        <input id="username"
-                               autofocus
-                               minlength=1
-                               autocomplete="off"
-                               autocapitalize="off"
-                               required
-                               aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
-                               class="validate <#if messagesPerField.existsError('username','password')>invalid</#if>"
-                               name="username" value="${(login.username!'')}" type="text"/>
-                    </#if>
-                    <label for="username"><#if !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if></label>
-                    <#if messagesPerField.existsError('username','password')>
-                       <span class="helper-text" data-error="${kcSanitize(messagesPerField.getFirstError('username','password'))?no_esc}"></span>
-                    </#if>
-                </div>
-
-                <div class="input-field col s12">
-                    <input id="password"
-                           name="password"
-                           type="password"
-                           required
-                           minlength=1
-                           autocomplete="off"
-                           aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
-                           class="validate <#if messagesPerField.existsError('username','password')>invalid</#if>" />
-                    <label for="password">${msg("password")}</label>
-                    <#if messagesPerField.existsError('username','password')>
-                       <span class="helper-text" data-error="${kcSanitize(messagesPerField.getFirstError('username','password'))?no_esc}"></span>
-                    </#if>
-                </div>
+                <@field.password name="password" label=msg("password") errors=["username", "password"]/>
 
                 <#if realm.rememberMe && !usernameEditDisabled??>
-                    <div class="input-field col s12">
-                        <div>
-                            <label>
-                                <#if login.rememberMe??>
-                                    <input id="rememberMe" name="rememberMe" type="checkbox" tabindex="3"
-                                           checked/><span>${msg("rememberMe")}</span>
-                                <#else>
-                                    <input id="rememberMe" name="rememberMe" type="checkbox"
-                                           tabindex="3"/><span>${msg("rememberMe")}</span>
-                                </#if>
-                            </label>
-                        </div>
-                    </div>
+                    <@field.checkbox name="rememberMe" label=msg("rememberMe") checked=login.rememberMe??/>
                 </#if>
-            </div>
 
-            <div class="col s12 center-align">
-                <button class="btn waves-effect waves-light" type="submit" name="login">${msg("doLogIn")}
-                    <i class="material-icons right">send</i>
-                </button>
-            </div>
+                <#-- The design's "Actions" frame: the button and the link are one group
+                     16px apart, rather than two blocks on the card's 24px rhythm. -->
+                <div class="or-actions">
+                    <@field.submit label=msg("doLogIn") name="login" id="kc-login"/>
 
-            <#if realm.resetPasswordAllowed>
-                <div class="col s12 center-align">
-                    <p><a href="${url.loginResetCredentialsUrl}">${msg("doForgotPassword")}</a></p>
+                    <#if realm.resetPasswordAllowed>
+                        <p class="or-card__aside">
+                            <@field.link href=url.loginResetCredentialsUrl label=msg("doForgotPassword")/>
+                        </p>
+                    </#if>
                 </div>
-            </#if>
-        </form>
+            </form>
         </#if>
-    <#elseif section = "info" >
-        <#if realm.password && realm.registrationAllowed && !usernameEditDisabled??>
-            <div id="kc-registration">
-                <span>${msg("noAccount")} <a href="${url.registrationUrl}">${msg("doRegister")}</a></span>
-            </div>
-        </#if>
-    <#elseif section = "socialProviders" >
+    <#-- No "New user? Register" block: the design's login card ends at "Forgot password?",
+         and registration is reached from the application rather than from here. -->
+    <#elseif section = "socialProviders">
         <#if realm.password && social?? && social.providers?has_content>
-            <div id="kc-social-providers" class="${properties.kcFormSocialAccountSectionClass!}">
-                <h4>${msg("identityProviderLoginLabel")}</h4>
-                <div class="button-container">
-                    <#list social.providers as p>
-                        <form action="${p.loginUrl}" method="post">
-                            <button class="btn waves-effect waves-light">${p.displayName}</button>
-                        </form>
-                    </#list>
-                </div>
+            <div id="kc-social-providers" class="or-social">
+                <div class="or-social__divider"><span>${msg("identityProviderLoginLabel")}</span></div>
+                <#list social.providers as p>
+                    <form action="${p.loginUrl}" method="post">
+                        <@field.submit label=p.displayName theme="secondary"/>
+                    </form>
+                </#list>
             </div>
         </#if>
     </#if>

@@ -1,47 +1,36 @@
 <#import "template.ftl" as layout>
+<#import "field.ftl" as field>
+<@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp')
+                            backHref=url.loginRestartFlowUrl backLabel=msg("backToLoginCredentials"); section>
+    <#if section = "header">
+        <#-- Same heading as the first login step, per the design; doLogIn is the button. -->
+        ${msg("loginAccountTitle")}
+    <#elseif section = "form">
+        <form id="kc-otp-login-form" action="${url.loginAction}" method="post">
 
-<@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp'); section>
+            <#if otpLogin.userOtpCredentials?size gt 1>
+                <#-- Replaces the previous hidden-radio-plus-styled-span hack. The native
+                     radio inputs stay in the light DOM so the choice still submits if the
+                     design system bundle is unavailable. -->
+                <or-vaadin-radio-group class="or-field" id="kc-otp-credential-box">
+                    <label slot="label">${msg("select2faDevice")}</label>
+                    <#list otpLogin.userOtpCredentials as otpCredential>
+                        <vaadin-radio-button>
+                            <label slot="label" for="kc-otp-credential-${otpCredential?index}">${otpCredential.userLabel}</label>
+                            <input slot="input"
+                                   id="kc-otp-credential-${otpCredential?index}"
+                                   type="radio"
+                                   name="selectedCredentialId"
+                                   value="${otpCredential.id}"
+                                   <#if otpCredential.id == otpLogin.selectedCredentialId>checked</#if>/>
+                        </vaadin-radio-button>
+                    </#list>
+                </or-vaadin-radio-group>
+            </#if>
 
-  <#if section="header">
-    ${msg("doLogIn")}
-  <#elseif section="form">
-    <form id="kc-otp-login-form" class="${properties.kcFormClass!}" action="${url.loginAction}" method="post">
+            <@field.otp name="otp" label=msg("loginOtpOneTime") autofocus=true errors=["totp"]/>
 
-      <#if otpLogin.userOtpCredentials?size gt 1>
-        <div class="${properties.kcFormGroupClass!}">
-          <div class="${properties.kcInputWrapperClass!}">
-            <label class="${properties.kcLabelClass!}">${msg("select2faDevice", "Select your 2FA device")}</label>
-            <div id="kc-otp-credential-box">
-              <#list otpLogin.userOtpCredentials as otpCredential>
-                <label>
-                  <input style="display: none" id="kc-otp-credential-${otpCredential?index}" class="${properties.kcLoginOTPListInputClass!}" name="selectedCredentialId" type="radio" tabindex="${otpCredential?index}" value="${otpCredential.id}" <#if otpCredential.id == otpLogin.selectedCredentialId>checked="checked"</#if>>
-                  <span>${otpCredential.userLabel}</span>
-                </label>
-              </#list>
-            </div>
-          </div>
-        </div>
-      </#if>
-
-      <div class="${properties.kcFormGroupClass!}" style="margin-top: 24px;">
-        <div class="input-field ${properties.kcLabelWrapperClass!}">
-          <input id="otp" name="otp" autocomplete="one-time-code" inputmode="numeric" type="text" class="validate <#if messagesPerField.existsError('totp')>invalid</#if> ${properties.kcInputClass!}" autofocus aria-invalid="<#if messagesPerField.existsError('totp')>true</#if>" dir="ltr" />
-          <label for="otp" class="${properties.kcLabelClass!}">${msg("loginOtpOneTime")}</label>
-          <#if messagesPerField.existsError('totp')>
-            <span class="helper-text" data-error="${kcSanitize(messagesPerField.getFirstError('totp'))?no_esc}"></span>
-          </#if>
-        </div>
-      </div>
-
-      <div class="${properties.kcFormGroupClass!}">
-        <div id="kc-form-buttons" class="col s12 center-align ${properties.kcFormButtonsClass!}">
-          <button type="submit" class="btn waves-effect waves-light" id="kc-login">${msg("doLogIn")}
-            <i class="material-icons right">send</i>
-          </button>
-        </div>
-      </div>
-
-    </form>
-  </#if>
-
+            <@field.submit label=msg("doLogIn") id="kc-login"/>
+        </form>
+    </#if>
 </@layout.registrationLayout>

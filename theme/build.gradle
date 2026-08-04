@@ -6,6 +6,91 @@ base {
     archivesName = "openremote-theme-provider"
 }
 
+// ---------------------------------------------------------------------------
+// OpenRemote design system
+//
+// The login theme renders @openremote/or-vaadin-components, styled by @openremote/theme.
+// Both are consumed as prebuilt bundles published to npm, so this repository needs no
+// JavaScript toolchain at all: upgrading the design system is a one-line change to
+// orUiVersion in login/theme.properties.
+//
+// The download writes straight into the theme's own resources directory (gitignored) so
+// that a plain `./gradlew installDist` produces a complete jar AND the bind-mounted
+// development flow in the README picks the assets up without a separate build step.
+// ---------------------------------------------------------------------------
+
+def loginThemeDir = file('src/main/resources/theme/openremote/login')
+def vendorDir = new File(loginThemeDir, 'resources/vendor')
+
+// theme.properties is the single source of truth for the version, so the value the
+// templates use for cache-busting can never drift from the bundles actually shipped.
+def designSystemVersion = {
+    def props = new Properties()
+    new File(loginThemeDir, 'theme.properties').withInputStream { props.load(it) }
+    def version = props.getProperty('orUiVersion')
+    if (!version) {
+        throw new GradleException('orUiVersion is not set in login/theme.properties')
+    }
+    return version
+}
+
+// Escape hatch while the bundles are not yet published: build them from a local openremote
+// checkout with theme/dev/build-design-system.sh and pass -PorUiLocal so the download is
+// skipped and the existing vendor directory is used as-is. Remove once the packages ship
+// bundles. Resolved here at configuration time; reading `project` from inside a task action
+// is not allowed by the configuration cache.
+def useLocalDesignSystem = project.hasProperty('orUiLocal')
+
+tasks.register('downloadDesignSystem') {
+    description = 'Downloads the prebuilt OpenRemote design system bundles used by the login theme'
+    group = 'build'
+
+    onlyIf { !useLocalDesignSystem }
+
+    def version = designSystemVersion()
+
+    // Keyed on the version so Gradle skips the download on repeat builds, and redoes it
+    // as soon as orUiVersion changes.
+    inputs.property('orUiVersion', version)
+    outputs.dir(vendorDir)
+
+    doLast {
+        // Artifact -> local filename. The font files are emitted next to the stylesheet by
+        // @openremote/theme's bundle and are referenced from it by relative URL, so their
+        // paths here must mirror the ones inside or-theme.css.
+        def artifacts = [
+            "@openremote/or-vaadin-components@${version}/dist/umd/index.bundle.js": 'or-vaadin.js',
+            "@openremote/theme@${version}/dist/index.css"                         : 'or-theme.css',
+            "@openremote/theme@${version}/dist/variable-latin/InterVariable-subset.woff2":
+                'variable-latin/InterVariable-subset.woff2',
+            "@openremote/theme@${version}/dist/variable-latin/InterVariable-Italic-subset.woff2":
+                'variable-latin/InterVariable-Italic-subset.woff2'
+        ]
+
+        vendorDir.mkdirs()
+
+        artifacts.each { specifier, target ->
+            def destination = new File(vendorDir, target)
+            destination.parentFile.mkdirs()
+
+            def url = "https://unpkg.com/${specifier}"
+            logger.lifecycle("Fetching ${url}")
+
+            try {
+                new URI(url).toURL().withInputStream { input ->
+                    destination.withOutputStream { output -> output << input }
+                }
+            } catch (IOException e) {
+                throw new GradleException(
+                    "Could not download ${url}. The login theme needs the prebuilt design " +
+                    "system bundles; check that version ${version} has been published.", e)
+            }
+        }
+    }
+}
+
+processResources.dependsOn downloadDesignSystem
+
 tasks.register('installDist', Copy) {
     into "${rootDir}/build/image"
     from jar.outputs
