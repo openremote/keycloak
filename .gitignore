@@ -28,6 +28,10 @@ manager/.factorypath/
 Pods/
 node_modules/
 
+# OpenRemote design system bundles, downloaded from npm by the theme build
+# (see theme/build.gradle, version pinned by orUiVersion in login/theme.properties)
+theme/src/main/resources/theme/openremote/login/resources/vendor/
+
 # Specific files and logs
 openremote.log
 dive.log
