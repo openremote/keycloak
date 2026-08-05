@@ -1,0 +1,41 @@
+{
+  "name": "openremote-keycloak-login-theme",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "yarn@4.17.1",
+  "description": "OpenRemote Keycloak login theme: Lit + @openremote/or-vaadin-components, bundled with rspack and wrapped into a Keycloak theme by Keycloakify.",
+  "scripts": {
+    "start": "cross-env NODE_ENV=development rspack serve",
+    "build": "rspack build",
+    "prebuild-keycloak-theme": "keycloakify update-kc-gen",
+    "build-keycloak-theme": "rspack build && keycloakify build && node scripts/write-implemented-pages.mjs"
+  },
+  "keycloakify": {
+    "accountThemeImplementation": "none",
+    "projectBuildDirPath": "dist",
+    "themeName": "openremote",
+    "keycloakVersionTargets": {
+      "22-to-25": false,
+      "all-other-versions": true
+    },
+    "environmentVariables": [
+      {
+        "name": "OR_MANAGER_URL",
+        "default": ""
+      }
+    ]
+  },
+  "dependencies": {
+    "@openremote/or-vaadin-components": "1.28.1",
+    "@openremote/theme": "1.28.1",
+    "keycloakify": "^11.15.11",
+    "lit": "^3.3.1"
+  },
+  "devDependencies": {
+    "@rspack/cli": "^1.6.0",
+    "@rspack/core": "^1.6.0",
+    "cross-env": "^7.0.3",
+    "inter-ui": "^4.1.1",
+    "typescript": "^5.9.0"
+  }
+}

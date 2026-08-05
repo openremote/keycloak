@@ -1,0 +1,13 @@
+/* The whole point of the rspack route: the design system is imported straight from npm,
+   bare @imports and font url()s and all. No vendoring, no download step, no theme.properties
+   version pin - upgrading is a package.json bump. */
+/* The package's exports map is "./*.css" -> "./src/*.css", so this lands on src/index.css. */
+@import "@openremote/theme/index.css";
+@import "./login.css";
+
+/* rspack aliases inter-ui/inter.css to the variable latin subset (see rspack.config.mjs),
+   which registers the family as "InterVariable" while default.css asks for "Inter". */
+:root {
+  --lumo-font-family: "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Roboto",
+    "Segoe UI", Helvetica, Arial, sans-serif;
+}

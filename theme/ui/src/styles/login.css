@@ -1,0 +1,580 @@
+/*
+ * Layout for the OpenRemote Keycloak login theme.
+ *
+ * Everything here is expressed in @openremote/theme tokens (--or-color-*), so a brand
+ * colour change is a token override and dark mode is the :root[theme~="dark"] block that
+ * the design system already ships. Nothing in this file hardcodes a brand colour.
+ *
+ * Component styling itself comes from the design system; this file only covers page layout.
+ * It carries no generic input/button/label fallbacks: every page this stylesheet loads on is
+ * one we render, so there is no inherited markup to catch.
+ */
+
+/* --------------------------------------------------------------------------
+ * Boot
+ * ------------------------------------------------------------------------ */
+
+/* Hidden only until branding.js resolves, so the stock palette does not flash before
+   the realm's own. Released by branding.js, by a timeout in template.ftl, or by the
+   <noscript> rule there. */
+html.or-booting body {
+  visibility: hidden;
+}
+
+/* --------------------------------------------------------------------------
+ * Page
+ * ------------------------------------------------------------------------ */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+/* --------------------------------------------------------------------------
+ * Icons
+ * ------------------------------------------------------------------------ */
+
+:root {
+  --or-icon-chevron-left: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 14"><path d="M7 1 1 7l6 6" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+}
+
+/* The design system's field label is secondary grey (Lumo's default); ensure nothing here
+   overrides it, and keep the value explicit so it survives future generic label rules. */
+.or-field {
+  --vaadin-input-field-label-color: var(--or-color-text-secondary);
+}
+
+/* Painted on html rather than body so the canvas is covered even when the document is
+   shorter than the viewport; relying on body-to-canvas propagation left a pale strip
+   below the fold. */
+html {
+  /* Defensive: background-color propagates to the canvas but background-image paints only
+     over the html box, so the tint would stop short if the document were ever shorter than
+     the viewport. */
+  min-height: 100vh;
+  background-color: var(--or-color-base);
+  /* Tints the page relative to the card in both light and dark themes. */
+  background-image: linear-gradient(var(--or-color-contrast-5pct), var(--or-color-contrast-5pct));
+}
+
+body {
+  font-family: var(--lumo-font-family, InterVariable, Inter, system-ui, sans-serif);
+  color: var(--or-color-text-body);
+}
+
+.or-login {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.9375rem;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+}
+
+/* --------------------------------------------------------------------------
+ * Brand
+ * ------------------------------------------------------------------------ */
+
+.or-login__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.375rem;
+  text-align: center;
+}
+
+/* Sized by width, not height: the default is a stacked lockup (mark over wordmark) while a
+   realm logo from manager_config.json may be any aspect, so constrain the axis they share
+   and let height follow. */
+#or-logo {
+  /* Explicit width: inside a shrink-to-fit flex column, width:100% resolved against the
+     wrong containing block and rendered the lockup ~12% small. 340.622px is the wordmark's
+     own width in the Figma export, which is what sets the lockup's. */
+  width: 21.289rem;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* The design sets the realm name in the heading colour at body weight-plus, not as muted
+   secondary text. */
+#or-app-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: var(--or-color-text-heading);
+}
+
+/* --------------------------------------------------------------------------
+ * Card
+ * ------------------------------------------------------------------------ */
+
+/*
+ * One gap, not a margin per element. Every card in the design is a flex column with a
+ * uniform 24px (Spacing-L) between its blocks - back link, title, form, actions - and
+ * reproducing that with margins is what previously needed values like 1.75rem to land on
+ * the same pixels.
+ */
+.or-card {
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 32.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--or-color-contrast-10pct);
+  border-radius: var(--lumo-border-radius-l, 0.5rem);
+  background-color: var(--or-color-base);
+  box-shadow: 0 1px 2px var(--or-color-contrast-5pct), 0 8px 24px var(--or-color-contrast-5pct);
+}
+
+/* Keycloak's wrappers carry no styling of their own and exist only because the base
+   templates expect the ids. Taking them out of the box tree lets the card's gap apply to
+   the content itself rather than to a single pass-through div. */
+#kc-content,
+#kc-content-wrapper {
+  display: contents;
+}
+
+/* Heading and lead are one block in the design (8px / Spacing-S apart), sitting 24px from
+   whatever precedes and follows it. */
+.or-card__title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.or-card__title h1 {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.253;
+  color: var(--or-color-text-heading);
+}
+
+/*
+ * Prose and links inside the card are all body size, not the small size these first used.
+ * Measured on the 1:1 reset-password export: the lead runs 446px against 391px at 0.875rem
+ * (x1.14), "Back to login" 97px against 84px (x1.16) and "Forgot password?" 135px against
+ * 116px (x1.16). The lead is also the same near-black as the heading - only field labels
+ * and genuinely subordinate notes are grey.
+ */
+.or-card__lead {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.611;
+  color: var(--or-color-text-body);
+}
+
+.or-card__back {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* A real chevron, masked so it takes the link colour. The single-angle-quote glyph this
+   used before is a punctuation mark: its size and baseline are font-dependent, so it sat
+   too small and too low next to the label. */
+.or-card__back a::before {
+  content: "";
+  display: inline-block;
+  /* Measured from the design: an 8px chevron with a 13px gap to the label, against a 16px
+     font - hence 0.5em, 0.875em and 0.8em. The box is deliberately the chevron's own 8:14
+     aspect, so `contain` leaves no slack inside it and the margin below *is* the gap. */
+  width: 0.5em;
+  height: 0.875em;
+  margin-inline-end: 0.8em;
+  vertical-align: -0.1em;
+  background-color: currentColor;
+  -webkit-mask: var(--or-icon-chevron-left) no-repeat center / contain;
+  mask: var(--or-icon-chevron-left) no-repeat center / contain;
+}
+
+.or-card__aside {
+  margin: 0;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.or-card__info {
+  margin: 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--or-color-contrast-10pct);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.or-required-note,
+.or-attempted-username {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--or-color-text-secondary);
+}
+
+.or-required {
+  color: var(--or-color-text-error);
+}
+
+/* --------------------------------------------------------------------------
+ * Links
+ * ------------------------------------------------------------------------ */
+
+/* Medium, not regular. Measured on the 1:1 reset-password export: "Back to login" is 96px
+   wide with 0.203 ink coverage against 94px and 0.178 at weight 400 - same height, ~14% more
+   ink, which is a weight step rather than a size difference. Set on the anchor so every link
+   in the card picks it up: back links, "Forgot password?", "Register", "Unable to scan?". */
+.or-card a,
+.or-link {
+  color: var(--or-color-text-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.or-card a:hover,
+.or-link:hover {
+  text-decoration: underline;
+}
+
+.or-card a:focus-visible,
+.or-link:focus-visible {
+  outline: 2px solid var(--or-color-primary);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* --------------------------------------------------------------------------
+ * Fields
+ * ------------------------------------------------------------------------ */
+
+/* Forms are flex columns on the same 24px rhythm as the card, so fields carry no spacing of
+   their own. Measured off the design: field boxes sit 24px apart, not the 20px this used. */
+.or-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.or-field {
+  width: 100%;
+}
+
+/* Before the design system bundle registers these elements they are inline by default,
+   which would run the label and input together. */
+or-vaadin-text-field:not(:defined),
+or-vaadin-password-field:not(:defined),
+or-vaadin-email-field:not(:defined),
+or-vaadin-checkbox:not(:defined),
+or-vaadin-radio-group:not(:defined),
+vaadin-radio-button:not(:defined) {
+  display: block;
+}
+
+or-vaadin-checkbox:not(:defined),
+vaadin-radio-button:not(:defined) {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* --------------------------------------------------------------------------
+ * Submit
+ *
+ * field.ftl renders a styled or-vaadin-button next to a native submit button that
+ * carries the real name/value. Exactly one is visible: :defined only matches once the
+ * design system has registered the element, so a missing or broken bundle degrades to
+ * the native button rather than an unclickable one.
+ * ------------------------------------------------------------------------ */
+
+/* The design's "Actions" frame: buttons grouped 16px apart, tighter than the 24px that
+   separates blocks. Used for the primary button plus whatever follows it - "Forgot
+   password?" on login, Cancel on the app-initiated screens. */
+.or-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.or-submit {
+  margin: 0;
+}
+
+.or-submit__styled {
+  width: 100%;
+}
+
+or-vaadin-button:not(:defined) {
+  display: none;
+}
+
+.or-submit:has(> or-vaadin-button:defined) > .or-submit__fallback {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --------------------------------------------------------------------------
+ * Alerts
+ * ------------------------------------------------------------------------ */
+
+.or-alert {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--lumo-border-radius-m, 0.375rem);
+  font-size: 0.875rem;
+}
+
+.or-alert--error {
+  background-color: var(--or-color-error-10pct);
+  color: var(--or-color-text-error);
+}
+
+.or-alert--warning {
+  background-color: var(--or-color-warning-10pct);
+  color: var(--or-color-text-warning);
+}
+
+.or-alert--success {
+  background-color: var(--or-color-success-10pct);
+  color: var(--or-color-text-success);
+}
+
+.or-alert--info {
+  background-color: var(--or-color-primary-10pct);
+  color: var(--or-color-text-primary);
+}
+
+/* --------------------------------------------------------------------------
+ * Locale switcher
+ *
+ * Plain links enhanced by Keycloak's own menu-button-links.js (inherited from the base
+ * theme), so the languages remain reachable without the design system bundle.
+ * ------------------------------------------------------------------------ */
+
+.or-locale {
+  position: absolute;
+  top: 1rem;
+  inset-inline-end: 1rem;
+}
+
+.or-locale > button {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--or-color-contrast-20pct);
+  border-radius: var(--lumo-border-radius-m, 0.375rem);
+  background: transparent;
+  color: var(--or-color-text-secondary);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.or-locale__list {
+  display: none;
+  position: absolute;
+  inset-inline-end: 0;
+  z-index: 10;
+  min-width: 8rem;
+  margin: 0.25rem 0 0;
+  padding: 0.25rem;
+  list-style: none;
+  border: 1px solid var(--or-color-contrast-10pct);
+  border-radius: var(--lumo-border-radius-m, 0.375rem);
+  background-color: var(--or-color-base);
+  box-shadow: 0 4px 16px var(--or-color-contrast-10pct);
+}
+
+.or-locale__list a {
+  display: block;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--lumo-border-radius-s, 0.25rem);
+  color: var(--or-color-text-body);
+  font-size: 0.875rem;
+}
+
+.or-locale__list a:hover {
+  background-color: var(--or-color-contrast-5pct);
+  text-decoration: none;
+}
+
+/* Revealed by hover/focus, and by menu-button-links.js toggling aria-expanded. */
+.or-locale:hover .or-locale__list,
+.or-locale:focus-within .or-locale__list,
+.or-locale > button[aria-expanded="true"] + .or-locale__list {
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+ * TOTP setup
+ * ------------------------------------------------------------------------ */
+
+/*
+ * Sized in em against the list's own font size, so the code and the text stay aligned if
+ * that font size ever changes.
+ *
+ * --or-steps-indent is the distance from the list edge to the text column; the markers sit
+ * in that space. The QR row lives *between* two lists rather than inside an <li>, so it
+ * reuses the value to line up with the text.
+ */
+/* The whole setup sequence is one block on an 8px rhythm (the design's "Frame 1102"), which
+   is what keeps the code tight against the steps either side of it. Spacing lives here so
+   the lists and the code row carry none of their own. */
+.or-steps-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.or-steps {
+  --or-steps-indent: 1.58em;
+
+  margin: 0;
+  padding-inline-start: var(--or-steps-indent);
+  /* Body size, not the small size this first used - measured off the design, the steps are
+     the same 1rem as the rest of the card, and getting that wrong shrank every gap below
+     with it, since they are all in em. */
+  font-size: 1rem;
+  /* Body colour, not secondary: in the design the setup instructions are the same near-black
+     as the heading. Only the field labels are grey. */
+  color: var(--or-color-text-body);
+}
+
+/*
+ * One value for every gap between blocks in the list - step to step, step text to the app
+ * names, and the step either side of the code. The design uses a single ~0.5em on top of the
+ * natural line pitch throughout. These collapse rather than add, so the <p> and the <li>
+ * carrying the same value still yields one 0.5em gap.
+ */
+.or-steps > li,
+.or-steps p {
+  margin: 0 0 0.5em;
+}
+
+
+/* The design lists the authenticator apps as plain lines aligned with the step text - no
+   bullets and no extra indent. */
+.or-steps__apps,
+.or-steps__meta {
+  margin: 0;
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+/*
+ * The code and its fallback link sit side by side, as in the design.
+ *
+ * The row sits between the two lists rather than inside an <li>, so it starts at the list
+ * edge. Indenting it by --or-steps-indent moves it to the text column, and subtracting the
+ * quiet zone lines up the *black area* with the text rather than the image edge. All in em
+ * against the same font size as the list, so the two stay locked together.
+ */
+.or-qr-row {
+  /* 160px in the design ("image 3"), including the code's own quiet zone. */
+  --or-qr-size: 10em;
+  /* The image carries its own quiet zone - 6px on a 208px canvas, see src/dev/qr-preview.ts.
+     Scaling that ratio with the rendered size is what lets the rules below position the
+     *ink* rather than the image edge, which is what actually reads as aligned. */
+  --or-qr-quiet: calc(var(--or-qr-size) * 6 / 208);
+  /* Where the ink sits relative to the list edge. The design puts it just left of the step
+     numbers, not out at the text column. */
+  --or-qr-inset: 0.3em;
+
+  display: flex;
+  align-items: center;
+  /* 8px from the code to the "Unable to scan?" button in the design. */
+  gap: 0.5em;
+  /* Matches .or-steps so every em here resolves against the same font size. */
+  font-size: 1rem;
+  /* Only the horizontal offset; .or-steps-block owns the vertical rhythm. */
+  margin: 0 0 0 calc(var(--or-qr-inset) - var(--or-qr-quiet));
+}
+
+/*
+ * The white background is not decoration: it is what keeps the code scannable in dark mode.
+ *
+ * Caveat: a production QR from Keycloak carries a ~10%-per-side quiet zone rather than the
+ * ~3% of the preview, so the ink renders smaller in the same box and sits inset from the
+ * text. Absorbing that properly means trimming the image at runtime - see the README.
+ */
+.or-qr {
+  display: block;
+  flex: none;
+  width: var(--or-qr-size);
+  height: var(--or-qr-size);
+  margin: 0;
+  border-radius: var(--lumo-border-radius-m, 0.375rem);
+  background-color: #fff;
+}
+
+.or-code {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--lumo-border-radius-s, 0.25rem);
+  background-color: var(--or-color-contrast-5pct);
+  font-family: monospace;
+  word-break: break-all;
+}
+
+/* --------------------------------------------------------------------------
+ * Social / identity providers
+ * ------------------------------------------------------------------------ */
+
+.or-social__divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0 1rem;
+  font-size: 0.8125rem;
+  color: var(--or-color-text-tertiary);
+}
+
+.or-social__divider::before,
+.or-social__divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--or-color-contrast-10pct);
+}
+
+.or-social .or-submit {
+  margin-top: 0.5rem;
+}
+
+/* NOTE: deliberately no generic `#kc-content input/button/label` block here. The pages
+   Keycloak serves from its own theme never load this stylesheet, so it would style nothing,
+   and such a rule is actively harmful anyway: an unqualified `#kc-content label` outranks
+   --vaadin-input-field-label-color and paints every field label body-black, where the design
+   (and Lumo) want secondary grey. */
+
+/* --------------------------------------------------------------------------
+ * Small screens
+ * ------------------------------------------------------------------------ */
+
+@media (max-width: 30rem) {
+  .or-login {
+    justify-content: flex-start;
+    padding: 1.5rem 0.75rem;
+  }
+
+  .or-card {
+    padding: 1.5rem 1.25rem;
+  }
+
+  /* Width, not height: the lockup is sized on its shared axis (see #or-logo above). */
+  #or-logo {
+    max-width: 15rem;
+  }
+}
+

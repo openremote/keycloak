@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>OpenRemote</title>
+    <script>
+      // Resolve the colour scheme before first paint, so a dark page never flashes light
+      // while the bundle boots. main.ts applies the same rule once it runs; this only moves
+      // the first application earlier. ?theme= is a dev-only override.
+      (function () {
+        var override = new URLSearchParams(location.search).get("theme");
+        var dark =
+          override === "dark" ||
+          (override !== "light" &&
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) {
+          document.documentElement.setAttribute("theme", "dark");
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>
