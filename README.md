@@ -4,11 +4,11 @@
 
 Keycloak docker image built for `postgres` with:
 
-* Default env variable values to assume running behind a reverse proxy sending `X-Forwarded-*` headers (env variables can be changed see keycloak documentation) 
+* Default env variable values to assume running behind a reverse proxy sending `X-Forwarded-*` headers (env variables can be changed see keycloak documentation)
 * Enables metrics and health endpoints by default
 * OpenRemote theme embedded and set as default (login and email templates only)
 * Request path to `/auth` (like older versions of Keycloak to simplify usage behind a reverse proxy)
-* Listener to configure roles of self-registered users. Roles are set using `KEYCLOAK_SELF_REGISTERED_USER_ROLES` environment variable,  
+* Listener to configure roles of self-registered users. Roles are set using `KEYCLOAK_SELF_REGISTERED_USER_ROLES` environment variable,
 the JSON structure is
 ```
 {
@@ -24,8 +24,8 @@ the JSON structure is
   ]
 }
 ```
-When assigning to the environment variable, it must be enclosed in double-quotes, properly escaped.  
-This can be done e.g. by piping to `jq -c | sed 's/"/\\"/g'`, which would result in `"{\"realmRoles\":[\"restricted_user\"],\"clientRoles\":[{\"client\":\"openremote\",\"roles\":[\"read:assets\",\"write:attributes\"]}]}"`  
+When assigning to the environment variable, it must be enclosed in double-quotes, properly escaped.
+This can be done e.g. by piping to `jq -c | sed 's/"/\\"/g'`, which would result in `"{\"realmRoles\":[\"restricted_user\"],\"clientRoles\":[{\"client\":\"openremote\",\"roles\":[\"read:assets\",\"write:attributes\"]}]}"`
 The listener is not enabled by default. In Keycloak, in the `Realm settings` - `Events` - `Event listeners` admin screen, `self-register-user-configure` should be added to the list.
 
 ## Working on the OpenRemote theme
@@ -133,7 +133,7 @@ appending `kc_action` to the auth request: `CONFIGURE_TOTP`, `UPDATE_PASSWORD`, 
 
 ### Branding
 
-Logo, application title, favicon and brand colour are read at runtime from the manager's
+Logo, application title, favicon and brand color are read at runtime from the manager's
 `manager_config.json`, via the public `GET /api/{realm}/configuration/manager` endpoint. A custom
 project therefore only needs its own manager config — **no changes to this theme**. Legacy configs
 are handled too: `styles` strings written for the Manager's shadow DOM (`:host > *`) are rewritten to
