@@ -55,17 +55,17 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
           autocomplete: "new-password"
         })}
         ${isAppInitiatedAction
-          ? html`<or-vaadin-checkbox class="or-field">
-              <label slot="label" for="logout-sessions">${msgStr("logoutOtherSessions")}</label>
-              <input
-                slot="input"
-                id="logout-sessions"
+          ? html`<!-- name and checked belong on the component; Vaadin manages the slotted
+                      input and drops anything it did not set. See field(). -->
+              <or-vaadin-checkbox
+                class="or-field"
                 name="logout-sessions"
-                type="checkbox"
                 value="on"
                 checked
-              />
-            </or-vaadin-checkbox>`
+              >
+                <label slot="label">${msgStr("logoutOtherSessions")}</label>
+                <input slot="input" type="checkbox" />
+              </or-vaadin-checkbox>`
           : null}
         <div class="or-actions">
           ${submitButton(msgStr("doSubmit"))}

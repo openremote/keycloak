@@ -47,17 +47,17 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
                 errorFields: ["username", "password"]
               })}
               ${realm.rememberMe
-                ? html`<or-vaadin-checkbox class="or-field">
-                    <label slot="label" for="rememberMe">${msgStr("rememberMe")}</label>
-                    <input
-                      slot="input"
-                      id="rememberMe"
+                ? html`<!-- name and checked belong on the component; Vaadin manages the
+                            slotted input and drops anything it did not set. See field(). -->
+                    <or-vaadin-checkbox
+                      class="or-field"
                       name="rememberMe"
-                      type="checkbox"
                       value="on"
                       ?checked=${!!login.rememberMe}
-                    />
-                  </or-vaadin-checkbox>`
+                    >
+                      <label slot="label">${msgStr("rememberMe")}</label>
+                      <input slot="input" type="checkbox" />
+                    </or-vaadin-checkbox>`
                 : null}
               <!-- The design's "Actions" frame: the button and the link are one group 16px
                    apart, rather than two blocks on the card's 24px rhythm. -->

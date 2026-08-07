@@ -43,11 +43,27 @@ from Figma (`Login-logo`). In production the logo comes from `manager_config.jso
 
 ## Vaadin / `@openremote/or-vaadin-components`
 
-- **Fields: emit the native input as a light-DOM child** —
-  `<or-vaadin-text-field><input slot="input" name="..."></or-vaadin-text-field>`.
-  `SlotController.initSingle()` reuses it and `InputControlMixin.delegateAttrs` forwards
-  `name`/`type`/`required`.
-- **That pattern does not generalise.** Two components actively destroy what you slot in:
+- **Form state goes on the component, never on the slotted `<input>`.** Slotting the native
+  input is right — `SlotController.initSingle()` reuses it rather than creating its own, and it
+  stays in the light DOM — but `InputControlMixin` then *manages* that element. It replaces the
+  `id` and **silently drops `name`, `value`, `required` and `autocomplete`**, re-delegating its
+  own from the host. Only `type`, `autofocus`, `inputmode` and `dir` survive on the input.
+
+  ```html
+  <!-- wrong: renders fine, posts nothing -->
+  <or-vaadin-text-field><input slot="input" name="username" required></or-vaadin-text-field>
+  <!-- right -->
+  <or-vaadin-text-field name="username" required><input slot="input"></or-vaadin-text-field>
+  ```
+
+  This shipped: every field on every page came out unnamed, so the login form posted a bare
+  `login=` and nothing else. It is invisible in the source, in the rendered page and in a
+  screenshot — **the only way to see it is `new FormData(form)` in a real browser.** The
+  `<label>` needs no `for`; Vaadin points it at the id it generated and adds `aria-labelledby`.
+- Setting `required` on the component makes Lumo render a bullet after the label. The design has
+  no required markers, so `login.css` hides `::part(required-indicator)` — semantics kept,
+  indicator gone.
+- **Two components go further and destroy what you slot in:**
   - **Buttons.** Vaadin's button is `role="button"` with no `type` and no form participation,
     and its Lumo styling is `:host`-scoped inside `@media lumo_components_button` so it cannot
     be applied to a native `<button>`. Emit both, show one via `:defined`, and forward with
