@@ -133,8 +133,8 @@ from Figma (`Login-logo`). In production the logo comes from `manager_config.jso
 - A CSS-mask icon with `contain` is inset by the box's slack. Give the box the icon's own
   aspect ratio and `margin-inline-end` becomes the actual visual gap.
 - `overflow-y: auto` clips `position: fixed` children. Move them to a sibling.
-- Prefer `em` and derive related values — the QR quiet zone is
-  `calc(var(--or-qr-size) * 6 / 208)`, which survives a change of image.
+- Prefer `em` and derive related values, so a change of font size or image does not need a
+  second edit somewhere else.
 
 ## Gradle
 

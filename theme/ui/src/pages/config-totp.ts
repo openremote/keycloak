@@ -4,6 +4,7 @@ import "@openremote/or-vaadin-components/or-vaadin-button";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../login/KcContext";
 import { field, layout, submitButton } from "../layout";
+import { trimQuietZone } from "../qr";
 
 export const pageId = "login-config-totp.ftl";
 
@@ -84,10 +85,13 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
 
           <!-- The design places the fallback link beside the code, not beneath it. -->
           <div class="or-qr-row">
+            <!-- Keycloak's quiet zone varies with the length of the otpauth URL, so it is
+                 cropped off on load and re-applied as padding - see src/qr.ts. -->
             <img
               class="or-qr"
               alt=${msgStr("loginTotpStep2")}
               src=${`data:image/png;base64,${totp.totpSecretQrCode}`}
+              @load=${trimQuietZone}
             />
             <a class="or-link" href=${totp.manualUrl}>${msgStr("loginTotpUnableToScan")}</a>
           </div>
