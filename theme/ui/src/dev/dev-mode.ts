@@ -10,7 +10,6 @@ import type { KcContext } from "../login/KcContext";
 import { applyBranding } from "../branding";
 import { applyTheme, readThemeOverride, renderPage } from "../render";
 import { mountPageNav } from "./page-nav";
-import { PREVIEW_QR_CODE_BASE64 } from "./qr-preview";
 
 const { getKcContextMock } = createGetKcContextMock({
   kcContextExtension: { themeName: "openremote", properties: {} },
@@ -80,17 +79,19 @@ export function runDevMode(root: HTMLElement): void {
     realm.registrationEmailAsUsername = false;
 
     /*
-     * The mock QR is mostly white border; swap in the cropped copy so the preview matches
-     * the design. Production QRs come from Keycloak untouched.
+     * The mock QR is left exactly as Keycloakify ships it: 246x246 with a 25px quiet zone,
+     * which is what Keycloak really sends (measured: 20px for one realm, 37px for the same
+     * realm renamed), so the preview goes through the same crop as production. It
+     * used to be swapped for a pre-cropped copy, which made the harness look right and hid
+     * the fact that production did not.
      *
      * The mock does list only two authenticator apps and pre-resolves their names, where
      * Keycloak sends message keys for three. Use the keys, so the preview matches the design
      * and exercises the lookup in config-totp.ts.
      */
-    const totp = (kcContext as { totp?: { supportedApplications: string[]; totpSecretQrCode: string } }).totp;
+    const totp = (kcContext as { totp?: { supportedApplications: string[] } }).totp;
 
     if (totp !== undefined) {
-      totp.totpSecretQrCode = PREVIEW_QR_CODE_BASE64;
       totp.supportedApplications = [
         "totpAppMicrosoftAuthenticatorName",
         "totpAppFreeOTPName",
