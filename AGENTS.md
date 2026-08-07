@@ -12,6 +12,9 @@ Work from the link you were given: node ids change when the file is reorganized,
 
 ## Messages
 
+- Do not override Keycloak's wording, in any language. Use the key Keycloak's own template uses for the same control, even where another key reads closer to the design.
+- `withCustomTranslations` is only for keys Keycloak has no message for. Its `en` block is the fallback for every language, so anything in it shows in every locale.
+- Messages the server resolved take precedence over custom translations, so a client-side override does not reach user-profile labels.
 - Keycloak sends message keys for anything a realm can configure (user-profile labels, `totp.supportedApplications`, admin messages). Resolve them with `advancedMsgStr`.
 
 ## Vaadin components
