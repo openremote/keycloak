@@ -35,9 +35,20 @@ function inDesignOrder<T extends { name: string }>(attributes: T[]): T[] {
 }
 
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, profile, passwordRequired, recaptchaRequired, recaptchaSiteKey } = kcContext;
+  const { url, realm, locale, profile, passwordRequired, recaptchaRequired, recaptchaSiteKey } =
+    kcContext;
   const { msgStr, advancedMsgStr } = i18n;
   const attributes = inDesignOrder(Object.values(profile.attributesByName));
+
+  /*
+   * With internationalization on, Keycloak adds a `locale` attribute to the registration
+   * profile. It is not a question for the user: its job is to carry the language they are
+   * reading the page in onto the account being created. Keycloak's own
+   * user-profile-commons.ftl special-cases it exactly this way, and without it the field
+   * renders as a text input labeled "locale" and posts back empty.
+   */
+  const isCarriedLocale = (name: string): boolean =>
+    name === "locale" && !!realm.internationalizationEnabled && !!locale?.currentLanguageTag;
 
   return layout({
     kcContext,
@@ -51,18 +62,25 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
         <input type="password" readonly value="this is not a login form" style="display:none" />
 
         ${attributes.map(attribute =>
-          field({
-            kcContext,
-            name: attribute.name,
-            /* displayName is a message key wrapped as ${...} for the built-in attributes and
-               free text for anything a realm has added; advancedMsgStr handles both, and
-               falls back to the attribute name when there is neither. */
-            label: advancedMsgStr(attribute.displayName ?? attribute.name),
-            type: attribute.name === "email" ? "email" : "text",
-            value: attribute.value,
-            required: attribute.required,
-            autocomplete: attribute.autocomplete
-          })
+          isCarriedLocale(attribute.name)
+            ? html`<input
+                type="hidden"
+                id="locale"
+                name="locale"
+                .value=${locale?.currentLanguageTag ?? ""}
+              />`
+            : field({
+                kcContext,
+                name: attribute.name,
+                /* displayName is a message key wrapped as ${...} for the built-in attributes
+                   and free text for anything a realm has added; advancedMsgStr handles both,
+                   and falls back to the attribute name when there is neither. */
+                label: advancedMsgStr(attribute.displayName ?? attribute.name),
+                type: attribute.name === "email" ? "email" : "text",
+                value: attribute.value,
+                required: attribute.required,
+                autocomplete: attribute.autocomplete
+              })
         )}
         ${passwordRequired
           ? html`
