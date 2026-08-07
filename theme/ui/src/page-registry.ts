@@ -48,10 +48,10 @@ function toPages(): ReadonlyMap<string, PageModule["render"]> {
  * pageId -> renderer, for every page under src/pages.
  *
  * Each page narrows kcContext to its own variant internally (via
- * `Extract<KcContext, { pageId: typeof pageId }>`), which is what keeps the per-page type
- * safety that caught the register.formData bug. The registry itself is necessarily
- * untyped across that boundary - the map key is what guarantees the pairing - so the cast
- * in PageModule is the single deliberate escape hatch in this file.
+ * `Extract<KcContext, { pageId: typeof pageId }>`), so a field that page's kcContext does not
+ * actually carry is a compile error. The registry itself is necessarily untyped across that
+ * boundary - the map key is what guarantees the pairing - so the cast in PageModule is the
+ * single deliberate escape hatch in this file.
  */
 export const pages = toPages();
 

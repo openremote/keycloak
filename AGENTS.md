@@ -43,9 +43,6 @@ from Figma (`Login-logo`). In production the logo comes from `manager_config.jso
 
 ## Vaadin / `@openremote/or-vaadin-components`
 
-- **Load the UMD bundle with `defer`.** It appends to `document.body` during evaluation, so a
-  sync `<script>` in `<head>` throws and only 1 of 7 elements registers. Looks like "the page
-  is unstyled", not like an error.
 - **Fields: emit the native input as a light-DOM child** —
   `<or-vaadin-text-field><input slot="input" name="..."></or-vaadin-text-field>`.
   `SlotController.initSingle()` reuses it and `InputControlMixin.delegateAttrs` forwards
@@ -64,8 +61,42 @@ from Figma (`Login-logo`). In production the logo comes from `manager_config.jso
 - **Inter:** alias `inter-ui/inter.css` (18 faces, 2.1 MB) to `inter-ui/inter-variable-latin.css`
   (~207 KB) and map `--lumo-font-family` onto `InterVariable` — `default.css` asks for `Inter`,
   which will not match.
+- The design system bundle appends to `document.body` during module evaluation, so it must be
+  loaded deferred. rspack does that by default.
 
-## Keycloak / FreeMarker
+## Keycloakify
+
+- **It generates a template for all ~39 login pages and routes every one into `src/main.ts`.**
+  `theme/build.gradle` deletes the ones we do not implement so Keycloak serves them from its
+  own theme via the generated `parent=keycloak`. The keep-list is derived from `src/pages`, so
+  adding a page file is genuinely the only step.
+- **`keycloakify build` deletes its own `build_keycloak/resources` once it has jarred it.** The
+  jar is the only durable output, which is why Gradle unpacks it.
+- **Maven is required even when its output is discarded** — the CLI checks for `mvn --version`
+  before doing anything, and refuses to run with every jar target disabled.
+- **`withCustomTranslations` applies to every language, not just the one you list it under.**
+  getI18n takes the block for the current language *or the `en` block* — so English house-style
+  wording put there leaks into all 30 locales and you get a Dutch page with an English card.
+  Only keys Keycloak has no translation for anywhere belong there; English preferences are
+  applied conditionally in `src/i18n.ts`.
+- **Messages the server resolved outrank custom translations.** The full order is
+  `kcContext["x-keycloakify"].messages`, then custom translations, then the bundled set. The
+  server contributes any `${key}` it found in a kcContext value — user-profile labels among
+  them — so overriding e.g. `email` client-side changes the login page and not the register
+  page. Those keys also need `theme/src/main/messages/messages_en.properties`, which the build
+  appends to the generated bundle.
+- Keycloakify writes Keycloak's whole message bundle into `login/messages/`, which is also what
+  makes the inherited pages translated. Append to it; do not replace it.
+- `KcContextExtensionPerPage` must be `{}`, not `Record<string, never>` — the latter collapses
+  `ExtendKcContext` to `never` and silently turns every field access into a type error.
+- `getKcContextMock` is not a plain function: use `createGetKcContextMock({...})` and take
+  `getKcContextMock` off the result.
+- `keycloakify update-kc-gen` writes `public/keycloakify-dev-resources`, and `keycloakify build`
+  hard-fails if that reaches the build output; `rspack.config.mjs` excludes it from the copy.
+- The generated page injects `<base href=".../dist/">`, so relative asset URLs work but relative
+  *link* and *form* targets would silently retarget. Use the absolute URLs from `kcContext`.
+
+## Keycloak
 
 - **Keycloak sends message *keys* for anything a realm can configure** —
   `totp.supportedApplications`, user-profile labels, admin-authored messages. Resolve them
@@ -109,11 +140,22 @@ from Figma (`Login-logo`). In production the logo comes from `manager_config.jso
 
 - `project.hasProperty()` inside `onlyIf` violates the configuration cache. Capture it at
   configuration time.
+- The jar is assembled from two resource roots. Anything left under
+  `src/main/resources/theme/openremote/login` collides with the generated theme and fails
+  `processResources` outright.
 
 ## Verifying
 
-`theme/dev/preview.html` (via `node theme/dev/serve.js`) is fast, but it is **hand-maintained
-duplicate markup that does not execute FreeMarker**. It has drifted from the templates twice,
-and every "bug" that produced turned out to be the harness, not the theme. When you change a
-template, update the harness in the same edit — and confirm anything structural against a
-real Keycloak (see `README.md`), which is the only thing that catches template errors.
+The dev server (`cd theme/ui && yarn start`) renders the real pages from Keycloakify's mocks, so
+unlike the previous hand-maintained preview harness it cannot drift from what ships — trust it
+for layout.
+
+**Do not trust the mocks to be representative, though.** Where the harness "fixed up" mock data
+to look like the design, it hid two production bugs at once: a pre-cropped QR concealed that
+real codes have a variable quiet zone, and looking right on screen concealed that the radio
+group posted nothing. Prefer changing the code so the real data renders correctly over changing
+the data so the code looks correct.
+
+It also cannot tell you anything about packaging — whether a page falls through to Keycloak's
+theme, whether the message merge worked, whether assets resolve under `url.resourcesPath`.
+Confirm those against a real Keycloak with the jar mounted (see `README.md`).
