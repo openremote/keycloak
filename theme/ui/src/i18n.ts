@@ -54,7 +54,21 @@ const { getI18n, ofTypeI18n } = i18nBuilder
       // Not in Keycloak's bundle at all.
       backToLoginCredentials: "Back to login credentials",
       select2faDevice: "Select your 2FA device",
+      /*
+       * Not ours: this is Keycloak's own string, verbatim, capital O and all
+       * (26.7 messages_en.properties line 18). It is here only because Keycloakify's bundled
+       * copy of the message set predates it, so removing this line blanks the button rather
+       * than falling back to Keycloak's wording. Delete it once Keycloakify catches up.
+       */
+      doSwitchOrganization: "Switch Organization",
       identityProviderLoginLabel: "Or continue with",
+      /*
+       * Keycloak's own string too (26.7 messages_en.properties), for the same reason: its
+       * error page prints the trace identifier support asks for, and Keycloakify's bundled
+       * message set predates the key. Only ever shown when tracing is enabled on the server.
+       */
+      traceIdSupportMessage:
+        "If you contact support, please provide the following trace identifier: {0}",
       // Fallback label for an OTP credential the user saved without naming it.
       otpDeviceFallback: "Device {0}"
     }

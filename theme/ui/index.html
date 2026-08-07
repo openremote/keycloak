@@ -10,13 +10,14 @@
       // while the bundle boots. main.ts applies the same rule once it runs; this only moves
       // the first application earlier. ?theme= is a dev-only override.
       (function () {
-        var override = new URLSearchParams(location.search).get("theme");
-        var dark =
-          override === "dark" ||
-          (override !== "light" &&
-            window.matchMedia &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches);
-        if (dark) {
+        // Off until the manager has dark mode too. Also see src/render.ts.
+        const FOLLOW_SYSTEM_DARK_MODE = false;
+        const override = new URLSearchParams(location.search).get("theme");
+        const prefersDark =
+          FOLLOW_SYSTEM_DARK_MODE &&
+          (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
+
+        if (override === "dark" || (override !== "light" && prefersDark)) {
           document.documentElement.setAttribute("theme", "dark");
         }
       })();

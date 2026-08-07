@@ -3,7 +3,7 @@ import "@openremote/or-vaadin-components/or-vaadin-text-field";
 import "@openremote/or-vaadin-components/or-vaadin-button";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../login/KcContext";
-import { field, layout, submitButton } from "../layout";
+import { field, layout, submitButton, usernameLabel } from "../layout";
 
 /** Narrowed to this page: kcContext is a discriminated union keyed on pageId. */
 export const pageId = "login-reset-password.ftl";
@@ -11,19 +11,19 @@ export const pageId = "login-reset-password.ftl";
 type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
 
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, realm, auth } = kcContext;
+  const { url, realm, auth, messagesPerField } = kcContext;
   const { msgStr } = i18n;
 
-  const label = !realm.loginWithEmailAllowed
-    ? msgStr("username")
-    : !realm.registrationEmailAsUsername
-      ? msgStr("usernameOrEmail")
-      : msgStr("email");
+  const label = usernameLabel(realm, i18n);
 
   return layout({
     kcContext,
+    i18n,
     heading: msgStr("emailForgotTitle"),
-    intro: msgStr("emailInstruction"),
+    displayMessage: !messagesPerField.existsError("username"),
+    /* The same switch Keycloak's own template makes: when a realm allows two accounts to share an
+       email address, an address cannot identify one, so the instruction asks for the username. */
+    intro: msgStr(realm.duplicateEmailsAllowed ? "emailInstructionUsername" : "emailInstruction"),
     back: { href: url.loginUrl, label: msgStr("backToLogin") },
     content: html`
       <form id="kc-reset-password-form" action=${url.loginAction} method="post">
