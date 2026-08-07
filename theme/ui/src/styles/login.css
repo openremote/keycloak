@@ -517,12 +517,29 @@ or-vaadin-button:not(:defined) {
  * against the same font size as the list, so the two stay locked together.
  */
 .or-qr-row {
-  /* 160px in the design ("image 3"), including the code's own quiet zone. */
+  /* 160px in the design ("image 3"), including the quiet zone below. */
   --or-qr-size: 10em;
-  /* The image carries its own quiet zone - 6px on a 208px canvas, see src/dev/qr-preview.ts.
-     Scaling that ratio with the rendered size is what lets the rules below position the
-     *ink* rather than the image edge, which is what actually reads as aligned. */
-  --or-qr-quiet: calc(var(--or-qr-size) * 6 / 208);
+  /* On top of whatever survives the crop below. A QR needs 4 modules of clear white to scan
+     reliably, and this is comfortably more than that at this size. */
+  --or-qr-quiet: 0.6em;
+  /*
+   * How much of Keycloak's image to cut off each side. Its quiet zone is four modules plus
+   * whatever is left over from fitting the code to a fixed 246px canvas, centred - so it is not a
+   * fixed fraction. Measured against a real Keycloak 26.7: 25px, 31px, 37px and 38px per side for
+   * four different realm-name and username combinations, i.e. 10.2% to 15.4%, and not monotonic in
+   * the URL length, because a smaller module size leaves a bigger remainder.
+   *
+   * 6% is therefore the safe number rather than the exact one: it is below every quiet zone a
+   * plausible otpauth URL can produce, so it can never eat into the code itself. What is left over
+   * is extra white, which costs a little size consistency and nothing else.
+   *
+   * The two below follow from it, and are written out because CSS cannot divide by a percentage:
+   * the image is scaled to 100/(100 - 2*6) so that its middle 88% fills the box, and shifted by
+   * -6/88 of that box to put the cropped edge out of view.
+   */
+  --or-qr-crop: 6%;
+  --or-qr-zoom: 113.637%;
+  --or-qr-shift: -6.819%;
   /* Where the ink sits relative to the list edge. The design puts it just left of the step
      numbers, not out at the text column. */
   --or-qr-inset: 0.3em;
@@ -538,20 +555,32 @@ or-vaadin-button:not(:defined) {
 }
 
 /*
- * The white background is not decoration: it is what keeps the code scannable in dark mode.
+ * The white background is not decoration: it is what keeps the code scannable in dark mode, and
+ * together with the border it is the quiet zone.
  *
- * Caveat: a production QR from Keycloak carries a ~10%-per-side quiet zone rather than the
- * ~3% of the preview, so the ink renders smaller in the same box and sits inset from the
- * text. Absorbing that properly means trimming the image at runtime - see the README.
+ * The crop is an oversized image inside a clipped box, rather than `object-view-box`, which reads
+ * far better but is Chromium-only - Firefox 134 and Safari 18.2 both report no support. The quiet
+ * zone is a border rather than padding, because `overflow` clips at the padding box: padding would
+ * be covered by the image, a border is not.
  */
 .or-qr {
   display: block;
   flex: none;
+  box-sizing: border-box;
   width: var(--or-qr-size);
   height: var(--or-qr-size);
+  border: var(--or-qr-quiet) solid #fff;
   margin: 0;
   border-radius: var(--lumo-border-radius-m, 0.375rem);
   background-color: #fff;
+  overflow: hidden;
+}
+
+.or-qr__code {
+  display: block;
+  width: var(--or-qr-zoom);
+  height: var(--or-qr-zoom);
+  margin: var(--or-qr-shift);
 }
 
 .or-code {

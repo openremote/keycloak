@@ -88,11 +88,15 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
 
           <!-- The design places the fallback link beside the code, not beneath it. -->
           <div class="or-qr-row">
-            <img
-              class="or-qr"
-              alt=${msgStr("loginTotpStep2")}
-              src=${`data:image/png;base64,${totp.totpSecretQrCode}`}
-            />
+            <!-- The image is oversized inside this box and the box clips it, which is how the
+                 quiet zone Keycloak bakes in gets cropped off. See .or-qr in login.css. -->
+            <span class="or-qr">
+              <img
+                class="or-qr__code"
+                alt=${msgStr("loginTotpStep2")}
+                src=${`data:image/png;base64,${totp.totpSecretQrCode}`}
+              />
+            </span>
             <a class="or-link" href=${totp.manualUrl}>${msgStr("loginTotpUnableToScan")}</a>
           </div>
 
