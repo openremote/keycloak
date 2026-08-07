@@ -10,11 +10,29 @@ export const pageId = "login-otp.ftl";
 
 type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
 
+/**
+ * Mirrors the radio group's selection into the hidden input that actually gets posted.
+ *
+ * The group owns the state; the input is only a carrier, for the same reason the submit
+ * buttons have one - the Vaadin component does not participate in form submission itself.
+ */
+function syncSelectedCredential(event: Event): void {
+  const group = event.currentTarget as HTMLElement & { value?: string };
+  const carrier = group
+    .closest("form")
+    ?.querySelector<HTMLInputElement>('input[name="selectedCredentialId"]');
+
+  if (carrier && typeof group.value === "string") {
+    carrier.value = group.value;
+  }
+}
+
 /** 2FA login. */
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
   const { url, otpLogin } = kcContext;
   const { msgStr } = i18n;
   const credentials = otpLogin.userOtpCredentials;
+  const selectedCredentialId = otpLogin.selectedCredentialId ?? credentials[0]?.id ?? "";
 
   return layout({
     kcContext,
@@ -31,26 +49,36 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
         -->
         ${credentials.length > 1
           ? html`
-              <or-vaadin-radio-group class="or-field" id="kc-otp-credential-box">
+              <!--
+                The selection is carried by the hidden input, not by the radios themselves.
+                Unlike the text fields, a slotted native <input> is no use here: Vaadin's
+                radio-group rewrites the name of every radio it owns to one generated group
+                name and RadioButton resets the value to "on", so a light-DOM
+                name="selectedCredentialId" value="<id>" is silently destroyed on upgrade and
+                the form posts nothing Keycloak recognizes.
+              -->
+              <input
+                type="hidden"
+                name="selectedCredentialId"
+                .value=${selectedCredentialId}
+              />
+              <or-vaadin-radio-group
+                class="or-field"
+                id="kc-otp-credential-box"
+                .value=${selectedCredentialId}
+                @value-changed=${syncSelectedCredential}
+              >
                 <label slot="label">${msgStr("select2faDevice")}</label>
                 ${credentials.map(
                   (credential, index) => html`
-                    <vaadin-radio-button>
+                    <vaadin-radio-button value=${credential.id}>
                       <!-- userLabel is whatever the user typed as the device name during
                            setup, and Keycloak lets that be blank - which renders a radio with
                            no visible or accessible label at all. Fall back to a position. -->
-                      <label slot="label" for=${`kc-otp-credential-${index}`}>
+                      <label slot="label">
                         ${credential.userLabel?.trim() ||
                         msgStr("otpDeviceFallback", String(index + 1))}
                       </label>
-                      <input
-                        slot="input"
-                        id=${`kc-otp-credential-${index}`}
-                        type="radio"
-                        name="selectedCredentialId"
-                        value=${credential.id}
-                        ?checked=${credential.id === otpLogin.selectedCredentialId}
-                      />
                     </vaadin-radio-button>
                   `
                 )}

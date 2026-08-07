@@ -83,13 +83,11 @@ export function runDevMode(root: HTMLElement): void {
      * The mock QR is mostly white border; swap in the cropped copy so the preview matches
      * the design. Production QRs come from Keycloak untouched.
      *
-     * The mock also lists only two authenticator apps and pre-resolves their names, where
-     * Keycloak sends message keys for three. Use the keys so the preview matches the design
+     * The mock does list only two authenticator apps and pre-resolves their names, where
+     * Keycloak sends message keys for three. Use the keys, so the preview matches the design
      * and exercises the lookup in config-totp.ts.
      */
-    const totp = (
-      kcContext as { totp?: { totpSecretQrCode: string; supportedApplications: string[] } }
-    ).totp;
+    const totp = (kcContext as { totp?: { supportedApplications: string[] } }).totp;
 
     if (totp !== undefined) {
       totp.totpSecretQrCode = PREVIEW_QR_CODE_BASE64;
