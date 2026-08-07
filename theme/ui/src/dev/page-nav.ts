@@ -23,7 +23,7 @@ const IMPLEMENTED = [...implementedPageIds].sort(byName);
 const NOT_IMPLEMENTED = ALL_PAGE_IDS.filter(id => !implementedPageIds.includes(id));
 
 /**
- * Below this the rail would start overlapping the centred card, so it collapses to a tab.
+ * Below this the rail would start overlapping the centered card, so it collapses to a tab.
  * Shared with the matchMedia listener below so the breakpoint is defined once.
  */
 /* Below this the rail covers too much of the card to leave open by default. */
@@ -31,7 +31,7 @@ const COLLAPSE_QUERY = "(max-width: 939.98px)";
 
 /*
  * A fixed left rail. It overlays rather than displacing the page, so the layout being
- * previewed is the real one - the card stays centred in the true viewport.
+ * previewed is the real one - the card stays centered in the true viewport.
  */
 const STYLES = `
 .dev-nav {
@@ -152,7 +152,7 @@ function withParams(changes: Record<string, string | null>): string {
 }
 
 /*
- * What a custom project would set in manager_config.json - the realm's primary colour and
+ * What a custom project would set in manager_config.json - the realm's primary color and
  * its own logo - without needing a manager running. branding.ts applies the real thing at
  * runtime; this is the same two knobs, driven by hand.
  */
@@ -183,26 +183,26 @@ function brandingControls(): HTMLElement {
   const style = document.createElement("style");
   document.head.appendChild(style);
 
-  const setBrand = (colour: string): void => {
-    style.textContent = colour
+  const setBrand = (color: string): void => {
+    style.textContent = color
       ? `:root, :root[theme~="dark"] {
-           --or-color-primary: ${colour};
-           --or-color-primary-50pct: color-mix(in srgb, ${colour} 76%, transparent);
-           --or-color-primary-10pct: color-mix(in srgb, ${colour} 13%, transparent);
-           --or-color-text-primary: ${colour};
+           --or-color-primary: ${color};
+           --or-color-primary-50pct: color-mix(in srgb, ${color} 76%, transparent);
+           --or-color-primary-10pct: color-mix(in srgb, ${color} 13%, transparent);
+           --or-color-text-primary: ${color};
          }`
       : "";
   };
 
-  const colourLabel = document.createElement("label");
-  colourLabel.className = "dev-nav__control";
-  colourLabel.innerHTML = "<span>Primary colour</span>";
-  const colour = document.createElement("input");
-  colour.type = "color";
-  colour.value = "#43a047";
-  colour.addEventListener("input", () => setBrand(colour.value));
-  colourLabel.appendChild(colour);
-  section.appendChild(colourLabel);
+  const colorLabel = document.createElement("label");
+  colorLabel.className = "dev-nav__control";
+  colorLabel.innerHTML = "<span>Primary color</span>";
+  const color = document.createElement("input");
+  color.type = "color";
+  color.value = "#43a047";
+  color.addEventListener("input", () => setBrand(color.value));
+  colorLabel.appendChild(color);
+  section.appendChild(colorLabel);
 
   const logoLabel = document.createElement("label");
   logoLabel.className = "dev-nav__control";
@@ -235,7 +235,7 @@ function brandingControls(): HTMLElement {
       URL.revokeObjectURL(logoObjectUrl);
       logoObjectUrl = null;
     }
-    colour.value = "#43a047";
+    color.value = "#43a047";
     logo.value = "";
     setBrand("");
     document.querySelectorAll<HTMLImageElement>("#or-logo").forEach(img => {

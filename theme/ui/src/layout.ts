@@ -146,7 +146,7 @@ export type FieldOptions = {
 };
 
 /**
- * A labelled input.
+ * A labeled input.
  *
  * The native <input> and <label> are light-DOM children: Vaadin's SlotController reuses an
  * existing slot="input"/slot="label" rather than creating its own, and LabelMixin documents

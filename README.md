@@ -54,7 +54,7 @@ docker build -t openremote/keycloak:dev .
 
 Gradle drives the whole thing, so this needs **Node 20+** on the PATH as well as a JDK. It also
 needs **Apache Maven**: Keycloakify shells out to it and refuses to start without it, even
-though the jar it produces that way is discarded in favour of Gradle's.
+though the jar it produces that way is discarded in favor of Gradle's.
 
 Upgrading the design system is a version bump in `theme/ui/package.json` — there is no vendoring
 step and nothing to keep in sync.
@@ -71,7 +71,7 @@ yarn start                   # http://localhost:5173
 
 A rail down the left lists every login page — those with an implementation first, then those
 inherited from Keycloak. Page data comes from Keycloakify's mocks, so every page has realistic
-values, and rspack live-reloads on save. Page, colour scheme and brand overrides all live in the
+values, and rspack live-reloads on save. Page, color scheme and brand overrides all live in the
 URL, so the state survives a reload:
 
 ```
@@ -114,7 +114,7 @@ docker cp ID:/opt/keycloak/lib/lib/main/org.keycloak.keycloak-themes-${VERSION}.
 
 ### Branding
 
-Logo, application title and brand colour are read at runtime from the manager's
+Logo, application title and brand color are read at runtime from the manager's
 `manager_config.json`, via the public `GET /api/{realm}/configuration/manager` endpoint. A custom
 project therefore only needs its own manager config — **no changes to this theme**. Legacy
 configs are handled too: `styles` strings written for the Manager's shadow DOM (`:host > *`) are
@@ -142,6 +142,6 @@ origins).
 ### Translations
 
 Pages address Keycloak's own message keys, and Keycloakify ships Keycloak's bundle for ~30
-languages, so enabling internationalisation on a realm translates the theme. OpenRemote's
+languages, so enabling internationalization on a realm translates the theme. OpenRemote's
 departures from that wording live in `theme/ui/src/i18n.ts`; a small number of them must also be
 in `theme/src/main/messages/messages_en.properties`, which explains why in its header.

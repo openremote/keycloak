@@ -2,7 +2,7 @@
  * Per-realm branding.
  *
  * Reads the manager's public GET /api/{realm}/configuration/manager and applies the realm's
- * logo, title and brand colour, so a custom project needs no changes to this theme - only
+ * logo, title and brand color, so a custom project needs no changes to this theme - only
  * its own manager_config.json.
  */
 import type { KcContext } from "./login/KcContext";
@@ -71,7 +71,7 @@ function applyStyles(styles: string | undefined): void {
 
   if (accent) {
     const c = accent[1].trim();
-    // The tint and hover variants are separate tokens; setting only the base colour would
+    // The tint and hover variants are separate tokens; setting only the base color would
     // leave button hover and focus rings on the stock green.
     addStyle(
       `${BRAND_SELECTOR}{` +

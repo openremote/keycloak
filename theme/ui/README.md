@@ -25,16 +25,16 @@ has realistic values, and rspack live-reloads on save.
 A rail down the left lists **all 38 login pages** in two sections: the ones with an
 implementation, then the ones a built theme leaves to Keycloak's own (clicking those shows a
 placeholder). It overlays rather than displacing the page, so the layout you are judging is the
-real one; below 940px it collapses to a tab at the left edge. It also carries brand colour and
+real one; below 940px it collapses to a tab at the left edge. It also carries brand color and
 logo overrides, for checking a custom project's branding without a manager running.
 
 Switching pages **does not reload the document** — the click is handled in place, the URL is
 updated with `pushState` and Lit re-renders. A real navigation re-parsed the bundle and, since
 rspack injects CSS through JS in development, repainted an unstyled frame each time, which is
-what made switching flash. Back/forward work via `popstate`, and `index.html` resolves the colour
+what made switching flash. Back/forward work via `popstate`, and `index.html` resolves the color
 scheme inline before first paint so a dark page never flashes light on hard reload.
 
-Pages and colour scheme are addressable directly:
+Pages and color scheme are addressable directly:
 
 ```
 http://localhost:5173/?page=login-config-totp.ftl

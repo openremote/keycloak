@@ -2,8 +2,8 @@
  * Layout for the OpenRemote Keycloak login theme.
  *
  * Everything here is expressed in @openremote/theme tokens (--or-color-*), so a brand
- * colour change is a token override and dark mode is the :root[theme~="dark"] block that
- * the design system already ships. Nothing in this file hardcodes a brand colour.
+ * color change is a token override and dark mode is the :root[theme~="dark"] block that
+ * the design system already ships. Nothing in this file hardcodes a brand color.
  *
  * Component styling itself comes from the design system; this file only covers page layout.
  * It carries no generic input/button/label fallbacks: every page this stylesheet loads on is
@@ -40,7 +40,7 @@ body {
   --or-icon-chevron-left: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 14"><path d="M7 1 1 7l6 6" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 }
 
-/* The design system's field label is secondary grey (Lumo's default); ensure nothing here
+/* The design system's field label is secondary gray (Lumo's default); ensure nothing here
    overrides it, and keep the value explicit so it survives future generic label rules. */
 .or-field {
   --vaadin-input-field-label-color: var(--or-color-text-secondary);
@@ -100,7 +100,7 @@ body {
   object-fit: contain;
 }
 
-/* The design sets the realm name in the heading colour at body weight-plus, not as muted
+/* The design sets the realm name in the heading color at body weight-plus, not as muted
    secondary text. */
 #or-app-title {
   margin: 0;
@@ -163,7 +163,7 @@ body {
  * Measured on the 1:1 reset-password export: the lead runs 446px against 391px at 0.875rem
  * (x1.14), "Back to login" 97px against 84px (x1.16) and "Forgot password?" 135px against
  * 116px (x1.16). The lead is also the same near-black as the heading - only field labels
- * and genuinely subordinate notes are grey.
+ * and genuinely subordinate notes are gray.
  */
 .or-card__lead {
   margin: 0;
@@ -177,7 +177,7 @@ body {
   font-size: 1rem;
 }
 
-/* A real chevron, masked so it takes the link colour. The single-angle-quote glyph this
+/* A real chevron, masked so it takes the link color. The single-angle-quote glyph this
    used before is a punctuation mark: its size and baseline are font-dependent, so it sat
    too small and too low next to the label. */
 .or-card__back a::before {
@@ -447,8 +447,8 @@ or-vaadin-button:not(:defined) {
      the same 1rem as the rest of the card, and getting that wrong shrank every gap below
      with it, since they are all in em. */
   font-size: 1rem;
-  /* Body colour, not secondary: in the design the setup instructions are the same near-black
-     as the heading. Only the field labels are grey. */
+  /* Body color, not secondary: in the design the setup instructions are the same near-black
+     as the heading. Only the field labels are gray. */
   color: var(--or-color-text-body);
 }
 
@@ -556,7 +556,7 @@ or-vaadin-button:not(:defined) {
    Keycloak serves from its own theme never load this stylesheet, so it would style nothing,
    and such a rule is actively harmful anyway: an unqualified `#kc-content label` outranks
    --vaadin-input-field-label-color and paints every field label body-black, where the design
-   (and Lumo) want secondary grey. */
+   (and Lumo) want secondary gray. */
 
 /* --------------------------------------------------------------------------
  * Small screens
