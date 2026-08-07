@@ -46,18 +46,23 @@ from Figma (`Login-logo`). In production the logo comes from `manager_config.jso
 - **Fields: emit the native input as a light-DOM child** —
   `<or-vaadin-text-field><input slot="input" name="..."></or-vaadin-text-field>`.
   `SlotController.initSingle()` reuses it and `InputControlMixin.delegateAttrs` forwards
-  `name`/`type`/`required`. Being in the light DOM keeps native submission working if the
-  bundle fails to load.
-- **Buttons cannot work that way.** Vaadin's button is `role="button"` with no `type` and no
-  form participation, and its Lumo styling is `:host`-scoped inside
-  `@media lumo_components_button` so it cannot be applied to a native `<button>`. Emit both,
-  show one via `:defined`, and forward with `form.requestSubmit(nativeButton)` — Keycloak
-  detects flags like `cancel-aia` by the submitter's name/value.
-- Label colour is `--vaadin-input-field-label-color`. An unqualified `#kc-content label` rule
-  silently overrides it on every field; the rule is scoped `label:not([slot])` because
-  Vaadin's own labels are slotted.
-- `@openremote/theme` cannot be bundled by its own rspack config (points at `src/index.ts`,
-  ships `src/index.js`). `theme/dev/build-design-system.sh` flattens it with esbuild instead.
+  `name`/`type`/`required`.
+- **That pattern does not generalise.** Two components actively destroy what you slot in:
+  - **Buttons.** Vaadin's button is `role="button"` with no `type` and no form participation,
+    and its Lumo styling is `:host`-scoped inside `@media lumo_components_button` so it cannot
+    be applied to a native `<button>`. Emit both, show one via `:defined`, and forward with
+    `form.requestSubmit(nativeButton)`.
+  - **Radio groups.** `or-vaadin-radio-group` rewrites the `name` of every radio it owns to
+    one generated group name, and `vaadin-radio-button` resets `value` to `"on"`. A slotted
+    `<input name="selectedCredentialId" value="<id>">` is silently replaced by
+    `name="or-vaadin-radio-group-8" value="on"`, so the form posts nothing Keycloak
+    understands and 2FA device selection quietly does nothing. Put `value` on the
+    `<vaadin-radio-button>`, and mirror the group's value into a hidden input on
+    `value-changed` (see `src/pages/otp.ts`).
+  - Assume nothing here: check with `new FormData(form)` in a real browser.
+- Label color is `--vaadin-input-field-label-color`. An unqualified `#kc-content label` rule
+  silently overrides it on every field; scope such rules `label:not([slot])`, because Vaadin's
+  own labels are slotted.
 - **Inter:** alias `inter-ui/inter.css` (18 faces, 2.1 MB) to `inter-ui/inter-variable-latin.css`
   (~207 KB) and map `--lumo-font-family` onto `InterVariable` — `default.css` asks for `Inter`,
   which will not match.
@@ -99,21 +104,26 @@ from Figma (`Login-logo`). In production the logo comes from `manager_config.jso
 ## Keycloak
 
 - **Keycloak sends message *keys* for anything a realm can configure** —
-  `totp.supportedApplications`, user-profile labels, admin-authored messages. Resolve them
-  with `${msg(key)}`, never a lookup table.
-- `register.ftl` uses `register.formData`, which is the pre-Keycloak-24 shape: it renders,
-  but values do not repopulate after a validation error and custom realm attributes are
-  ignored. Moving to `profile.attributesByName` is a behaviour change, not a restyle.
+  `totp.supportedApplications`, user-profile labels, admin-authored messages. Resolve them with
+  `advancedMsgStr`, never a lookup table.
+- Registration is driven by `profile.attributesByName` from Keycloak 24 onwards.
+- **`locale` is a user-profile attribute, not a question.** With internationalization on,
+  Keycloak adds it to the registration profile so the language the user is reading in follows
+  onto the account. Its `displayName` is the bare string `locale` and it has no annotations, so
+  rendering the profile naively gives a text field labeled "locale" that posts back empty.
+  Keycloak's own `user-profile-commons.ftl` special-cases it into a hidden input; so do we.
 - OTP errors come back under field **`totp`**, not `otp`.
 - `otpLogin.userOtpCredentials[].userLabel` **may be blank** — rendering it raw gives a radio
   with no accessible label. Keycloak's own `login-otp.ftl` has the same hole.
-- Use `parent=base`. `parent=keycloak` pulls PatternFly v3 *and* v4 via `stylesCommon`.
-- `${url.resourcesPath}`'s cache-buster comes from the **Keycloak** version, not the theme —
-  hence `orUiVersion` stamping the asset URLs.
-- Production QR codes carry a ~10%-per-side quiet zone; a layout tuned against a cropped
-  preview will show a wider white margin.
-- The theme's `messages_en.properties` only overrides what differs; everything else falls
-  through to the base bundle. A missing key renders as `??key??`.
+- `login-config-totp` arrives with a `warning` message saying the user needs to set up an
+  authenticator, which the page's own heading and steps already say. It is suppressed.
+- **The QR code's quiet zone is not a fixed ratio.** Keycloak scales the code onto a fixed
+  246x246 canvas, so the white border is whatever is left after fitting however many modules
+  the otpauth URL needs — measured at 20px for one realm and 37px for the same realm renamed.
+  Nothing can be hardcoded against it; `src/qr.ts` crops to the ink and CSS re-applies a quiet
+  zone we control.
+- Set only the realm's **login** theme. `--spi-theme-default=openremote` makes Keycloak look for
+  an *admin* theme of that name too, and the admin console then fails to load.
 
 ## CSS
 
