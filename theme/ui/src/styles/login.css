@@ -66,6 +66,8 @@ body {
 
 .or-login {
   box-sizing: border-box;
+  /* Containing block for the locale switcher, which is pinned to the page's top corner. */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -128,10 +130,8 @@ body {
   width: 100%;
   max-width: 32.5rem;
   padding: 1.5rem;
-  border: 1px solid var(--or-color-contrast-10pct);
   border-radius: var(--lumo-border-radius-l, 0.5rem);
   background-color: var(--or-color-base);
-  box-shadow: 0 1px 2px var(--or-color-contrast-5pct), 0 8px 24px var(--or-color-contrast-5pct);
 }
 
 /* Keycloak's wrappers carry no styling of their own and exist only because the base
@@ -172,6 +172,26 @@ body {
   color: var(--or-color-text-body);
 }
 
+/*
+ * Body copy for the pages that are only prose - page expired, "we emailed you a link".
+ *
+ * They need a block of their own because #kc-content-wrapper is `display: contents`: without
+ * one, every paragraph becomes a direct child of the card and picks up its 24px rhythm, which
+ * is the spacing between *sections* of a page, not between consecutive sentences.
+ */
+.or-prose {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.or-prose p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.611;
+  color: var(--or-color-text-body);
+}
+
 .or-card__back {
   margin: 0;
   font-size: 1rem;
@@ -199,25 +219,6 @@ body {
   margin: 0;
   font-size: 1rem;
   text-align: center;
-}
-
-.or-card__info {
-  margin: 0;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--or-color-contrast-10pct);
-  font-size: 1rem;
-  text-align: center;
-}
-
-.or-required-note,
-.or-attempted-username {
-  margin: 0 0 1rem;
-  font-size: 0.875rem;
-  color: var(--or-color-text-secondary);
-}
-
-.or-required {
-  color: var(--or-color-text-error);
 }
 
 /* --------------------------------------------------------------------------
@@ -361,60 +362,86 @@ or-vaadin-button:not(:defined) {
 /* --------------------------------------------------------------------------
  * Locale switcher
  *
- * Plain links enhanced by Keycloak's own menu-button-links.js (inherited from the base
- * theme), so the languages remain reachable without the design system bundle.
+ * Positioning only. The control is an <or-vaadin-select>, so its appearance, its overlay and
+ * all of its keyboard behavior belong to the design system - there is deliberately nothing
+ * here reaching into its internals, since that is the whole point of it being a Vaadin
+ * component rather than the hand-rolled menu button it replaced.
  * ------------------------------------------------------------------------ */
 
+/* Pinned to the page's top corner, out of the flex flow, while remaining the first child of
+   .or-login - which is what puts it first in the tab order. Absolute rather than fixed so it
+   scrolls away with the rest of a page taller than the viewport, like register. */
 .or-locale {
   position: absolute;
   top: 1rem;
   inset-inline-end: 1rem;
+
+  /*
+   * Figma "Log in pages" > Frame 1655 > Button, node 768:22549.
+   *
+   * The design draws the closed control as a <vaadin-button>: a tinted, borderless shape with
+   * the language in the primary color - not Vaadin's default bordered field. Every value here
+   * is the variable the design itself names, mapped to the Vaadin 25 property that consumes
+   * it, so this stays a token mapping rather than a restyle and a theme change still moves it.
+   *
+   * The overlay is stock Lumo apart from its width - Shadow M and the lumo:checkmark on the
+   * selected item are already what the design draws.
+   */
+  --vaadin-input-field-background: var(--lumo-contrast-5pct);
+  --vaadin-input-field-border-width: 0;
+  --vaadin-input-field-border-radius: var(--lumo-border-radius-m);
+  --vaadin-input-field-value-color: var(--lumo-primary-text-color);
+  --vaadin-input-field-value-font-size: var(--lumo-font-size-m);
+  /* Typography/Font-weight (inputs) = Medium. */
+  --vaadin-input-field-value-font-weight: 500;
+  /* 8px block; 14px is Component sizes/Button/Button horizontal padding. */
+  --vaadin-input-field-padding: 8px 14px;
+
+  /*
+   * Figma "Combo Box Overlay", node 768:22644: 194px wide, sitting at x=-110 against an 84px
+   * button, so it opens leftwards and its right edge lines up with the control. Vaadin already
+   * right-aligns it; only the width needed saying, and left to itself it takes the button's own
+   * width and grew to just 142px.
+   *
+   * This is the documented lever (see vaadin-select.js) and it sets `min-width`, not `width`,
+   * which is the behavior worth keeping: the realm chooses the languages, and a longer name than
+   * the design was drawn with should widen the list rather than be clipped by it.
+   */
+  --vaadin-select-overlay-width: 194px;
+
+  /*
+   * The design hugs the language name - 84px for "English" - so max-content lets the longer
+   * ones (Nederlands, Português) fit rather than clipping at the design's own measurement.
+   *
+   * min-width is what stops it collapsing. `[part=input-field]` is `min-width: 100%;
+   * max-width: 100%`, so a shrink-to-fit host has nothing to size against and the field
+   * flattens to nothing - which reads exactly like the value never being set, and is what an
+   * earlier `width: auto` here did.
+   */
+  width: max-content;
+  min-width: 84px;
 }
 
-.or-locale > button {
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--or-color-contrast-20pct);
-  border-radius: var(--lumo-border-radius-m, 0.375rem);
-  background: transparent;
-  color: var(--or-color-text-secondary);
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-
-.or-locale__list {
+/* The design shows no dropdown arrow: the shape is exactly as wide as the word. */
+.or-locale::part(toggle-button) {
   display: none;
-  position: absolute;
-  inset-inline-end: 0;
-  z-index: 10;
-  min-width: 8rem;
-  margin: 0.25rem 0 0;
-  padding: 0.25rem;
-  list-style: none;
-  border: 1px solid var(--or-color-contrast-10pct);
-  border-radius: var(--lumo-border-radius-m, 0.375rem);
-  background-color: var(--or-color-base);
-  box-shadow: 0 4px 16px var(--or-color-contrast-10pct);
 }
 
-.or-locale__list a {
-  display: block;
-  padding: 0.375rem 0.5rem;
-  border-radius: var(--lumo-border-radius-s, 0.25rem);
-  color: var(--or-color-text-body);
-  font-size: 0.875rem;
-}
-
-.or-locale__list a:hover {
-  background-color: var(--or-color-contrast-5pct);
-  text-decoration: none;
-}
-
-/* Revealed by hover/focus, and by menu-button-links.js toggling aria-expanded. */
-.or-locale:hover .or-locale__list,
-.or-locale:focus-within .or-locale__list,
-.or-locale > button[aria-expanded="true"] + .or-locale__list {
-  display: block;
+/*
+ * Center the language in the closed control - the design's `text-center` on the button label.
+ *
+ * It has to be text-align. The selected item is cloned into the value button and stretched to
+ * its full width, so the text sits at the start of a box ~9px wider than itself, about 4.5px
+ * left of center. The obvious levers do nothing: vaadin-select-value-button computes to
+ * `display: block` here, so justify-content on it is inert, and the item's own `[part=content]`
+ * is block too, so neither justify-content nor --vaadin-item-text-align (which that part reads)
+ * has anything to act on. text-align inherits through both.
+ *
+ * Scoped to the value slot on purpose. The overlay is a sibling slot on the same element, and
+ * its rows are left-aligned in the design, with room at the start of each for the checkmark.
+ */
+.or-locale [slot="value"] {
+  text-align: center;
 }
 
 /* --------------------------------------------------------------------------
@@ -532,24 +559,42 @@ or-vaadin-button:not(:defined) {
  * Social / identity providers
  * ------------------------------------------------------------------------ */
 
-.or-social__divider {
+/*
+ * Figma "Log in pages" > Login > Actions > Frame 1660, node 789:24233.
+ *
+ * The providers are a tinted panel inside the card, not a rule across it. This was a divider
+ * with a line either side and a 13px label, which is a common pattern but not the one drawn -
+ * and it went unnoticed because the dev harness had no providers to render until the mock in
+ * src/dev/dev-mode.ts was given some.
+ *
+ * The buttons need nothing: `theme="secondary"` already computes to exactly what the design
+ * specifies (contrast-5pct fill, border-radius-m, primary text, font-size-m, weight 500, 36px).
+ * Verified in a browser rather than assumed.
+ */
+.or-social {
+  display: flex;
+  flex-direction: column;
+  /* Spacing/spacing-m, which is also the gap between the buttons inside the panel. */
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: var(--lumo-border-radius-l, 0.75em);
+  background-color: var(--or-color-contrast-5pct);
+}
+
+/*
+ * A plain centered label, at body size rather than the small size this used. The design draws
+ * it as a tertiary button, which is why it carries the same 36px height as the real buttons
+ * below it rather than being sized by its own line box.
+ */
+.or-social__label {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin: 1.5rem 0 1rem;
-  font-size: 0.8125rem;
+  justify-content: center;
+  /* The panel's gap does the spacing; a <p>'s own margin would add to it. */
+  margin: 0;
+  height: 36px;
+  font-size: var(--lumo-font-size-m, 1rem);
   color: var(--or-color-text-tertiary);
-}
-
-.or-social__divider::before,
-.or-social__divider::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--or-color-contrast-10pct);
-}
-
-.or-social .or-submit {
-  margin-top: 0.5rem;
 }
 
 /* NOTE: deliberately no generic `#kc-content input/button/label` block here. The pages
@@ -565,7 +610,10 @@ or-vaadin-button:not(:defined) {
 @media (max-width: 30rem) {
   .or-login {
     justify-content: flex-start;
-    padding: 1.5rem 0.75rem;
+    /* Extra top padding, not the 1.5rem the other edges get: the content starts at the top
+       here, and the locale switcher is pinned in that corner. Without this the logo - which is
+       centered and up to 15rem wide - runs underneath it. */
+    padding: 4.25rem 0.75rem 1.5rem;
   }
 
   .or-card {
@@ -578,3 +626,71 @@ or-vaadin-button:not(:defined) {
   }
 }
 
+
+/* --------------------------------------------------------------------------
+ * Flow controls and profile-driven fields
+ * ------------------------------------------------------------------------ */
+
+/* "Try another way" / "Switch organization": Keycloak renders these around every page, so
+   they sit below the form as a quiet group rather than competing with its primary action. */
+.or-flow-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Helper text a realm can attach to any user profile attribute. */
+.or-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.or-field-help {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--or-color-text-secondary);
+}
+
+.or-field-error {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--or-color-text-error);
+}
+
+/* Multi-value profile attributes: a real fieldset, so the group has one accessible name. */
+.or-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.or-checkboxes legend {
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--or-color-text-secondary);
+}
+
+/* Terms and conditions, shown above the acceptance checkbox when the realm requires them. */
+.or-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.or-terms__title {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Realm-authored prose of unknown length; keep it from pushing the card off-screen. */
+.or-terms__text {
+  max-height: 12rem;
+  overflow-y: auto;
+  font-size: 0.875rem;
+  color: var(--or-color-text-secondary);
+}

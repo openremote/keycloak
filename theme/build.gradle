@@ -24,6 +24,22 @@ base {
 def uiDir = file('ui')
 def uiBuildDir = new File(uiDir, 'build_keycloak')
 
+/*
+ * The theme Keycloak serves the pages this one does not implement from. Keycloakify writes
+ * `parent=keycloak`; unpackLoginTheme rewrites it to whatever this resolves to, and
+ * ui/dev-server/stock.mjs previews those pages by reading the rewritten file, so the two cannot
+ * drift.
+ *
+ * The default is `keycloak.v2`, Keycloak's PatternFly 5 theme and what a fresh realm uses. It does
+ * not exist before Keycloak 24, which is below the 26 this theme needs anyway (see README), but
+ * mind it when deploying the jar anywhere else: a `parent=` that does not resolve does not
+ * degrade - Keycloak fails to load the theme at all and serves its own for every page, logging
+ * `Failed to find LOGIN theme openremote`. `-PloginParentTheme=keycloak` selects Keycloak's older
+ * theme instead.
+ */
+def KEYCLOAKIFY_PARENT = 'keycloak'
+def FALLBACK_THEME = providers.gradleProperty('loginParentTheme').getOrElse('keycloak.v2')
+
 // The only jar target enabled in ui/package.json, so this name is fixed.
 def uiJar = new File(uiBuildDir, 'keycloak-theme-for-kc-all-other-versions.jar')
 
@@ -31,10 +47,6 @@ def uiJar = new File(uiBuildDir, 'keycloak-theme-for-kc-all-other-versions.jar')
 def implementedPagesFile = new File(uiBuildDir, 'implemented-pages.txt')
 
 def unpackedThemeDir = layout.buildDirectory.dir('login-theme').get().asFile
-
-// Merged into the generated message bundle rather than shipped as a resource of their own;
-// see the doLast below and the file's own header.
-def messageOverridesDir = file('src/main/messages')
 
 // Yarn is invoked through the release committed under ui/.yarn/releases rather than through
 // corepack, so the build needs nothing on the PATH beyond node itself.
@@ -75,17 +87,24 @@ tasks.register('buildLoginTheme', Exec) {
 /*
  * Keycloakify deletes its resources tree once it has jarred it, so the jar is the only thing
  * left to work from. Unpacking it here rather than shipping it as-is lets this module own the
- * two things Keycloakify cannot know about:
+ * three things Keycloakify cannot know about:
  *
  *   - the theme descriptor, which has to declare the email theme as well as the login one
  *   - which pages we actually implement; the rest are dropped so that Keycloak resolves them
- *     through the generated `parent=keycloak` and serves them from its own theme
+ *     through the theme's `parent=` and serves them from its own theme
+ *   - which theme that is; see below
  */
 tasks.register('unpackLoginTheme', Sync) {
     description = 'Unpacks the built login theme, dropping the pages Keycloak will serve itself'
     group = 'build'
 
     dependsOn 'buildLoginTheme'
+
+    def descriptor = new File(unpackedThemeDir, 'theme/openremote/login/theme.properties')
+
+    // Declared, so changing it re-runs this: without it the task stays up to date and the flag
+    // silently does nothing, which is a worse failure than not having the flag.
+    inputs.property('loginParentTheme', FALLBACK_THEME)
 
     from(zipTree(uiJar)) {
         exclude 'META-INF/**'
@@ -103,24 +122,22 @@ tasks.register('unpackLoginTheme', Sync) {
     }
     includeEmptyDirs = false
 
-    inputs.dir(messageOverridesDir)
-
     /*
-     * Keycloakify writes Keycloak's whole message bundle into the theme, which is what makes
-     * kcContext values like the user profile's "${email}" resolve before the page even loads.
-     * Appending rather than replacing keeps that bundle intact; java.util.Properties takes the
-     * last definition of a key, so these win.
+     * Points the inherited pages at `loginParentTheme`. Ours are unaffected either way: they carry
+     * their own stylesheet and inherit nothing from the parent.
      */
+    filesMatching('theme/openremote/login/theme.properties') {
+        filter { line -> line == "parent=${KEYCLOAKIFY_PARENT}".toString() ? "parent=${FALLBACK_THEME}".toString() : line }
+    }
+
     doLast {
-        messageOverridesDir.listFiles({ f -> f.name.endsWith('.properties') } as FileFilter)
-                .each { overrideFile ->
-            def target = new File(unpackedThemeDir, "theme/openremote/login/messages/${overrideFile.name}")
-            if (!target.exists()) {
-                throw new GradleException(
-                        "No generated ${overrideFile.name} to append to; the build no longer " +
-                        "emits the message bundle these overrides assume.")
-            }
-            target << "\n# --- OpenRemote overrides ---\n" << overrideFile.text
+        // If a Keycloakify upgrade stops writing that line, fail here rather than quietly shipping
+        // whatever it wrote instead - the dev server reads this file to preview the same pages.
+        if (!descriptor.readLines().contains("parent=${FALLBACK_THEME}".toString())) {
+            throw new GradleException(
+                    "Expected `parent=${KEYCLOAKIFY_PARENT}` in the generated ${descriptor.name} to rewrite to " +
+                            "`parent=${FALLBACK_THEME}`, but it reads: " +
+                            descriptor.readLines().find { it.startsWith('parent=') })
         }
     }
 }

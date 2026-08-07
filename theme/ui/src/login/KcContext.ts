@@ -16,6 +16,12 @@ import type { ExtendKcContext } from "keycloakify/login";
 export type KcContextExtension = {
   themeName: string;
   properties: Record<string, string | undefined>;
+  /**
+   * Set by Keycloak when the user is mid-flow in an organization that offers others to switch
+   * to. Keycloakify does not model it yet, but its own template.ftl renders the control, so
+   * without this the option simply disappears.
+   */
+  switchOrganizationEnabled?: boolean;
 };
 
 /*
@@ -31,7 +37,29 @@ export type KcContextExtension = {
  * every kcContext field access into a type error.
  */
 export type KcContextExtensionPerPage = {
-  "login-update-password.ftl": { username: string };
+  /*
+   * Optional, though Keycloak's own theme renders it unconditionally into the hidden field
+   * password managers key off. Keycloakify's per-page mock omits it, and a property binding of
+   * `undefined` puts the string "undefined" in the field and posts it - so the page defaults
+   * it rather than trusting the declaration.
+   */
+  "login-update-password.ftl": { username?: string };
+  /*
+   * Keycloakify types both identity-brokering pages as carrying `idpAlias`. Keycloak's own
+   * templates read `idpDisplayName` - the provider's configured display name, falling back to
+   * the alias - which is what belongs on screen: "Add to existing account" next to "GitHub",
+   * not next to "github-oidc-2". Declared optional so the alias remains the fallback.
+   */
+  "login-idp-link-confirm.ftl": {
+    idpDisplayName?: string;
+    /**
+     * Set by Keycloak when reviewing the profile is not on offer - the realm's first broker
+     * login flow has no Review Profile step, so the button would post an action nothing
+     * handles.
+     */
+    hideReviewButton?: boolean;
+  };
+  "login-idp-link-email.ftl": { idpDisplayName?: string };
 };
 
 export type KcContext = ExtendKcContext<KcContextExtension, KcContextExtensionPerPage>;

@@ -19,6 +19,7 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
 
   return layout({
     kcContext,
+    i18n,
     heading: msgStr("errorTitle"),
     content: client?.baseUrl
       ? html`<p class="or-card__aside">

@@ -4,19 +4,21 @@ import "@openremote/or-vaadin-components/or-vaadin-checkbox";
 import "@openremote/or-vaadin-components/or-vaadin-button";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../login/KcContext";
-import { field, layout, submitButton } from "../layout";
+import { cancelButton, field, layout, submitButton } from "../layout";
 
 export const pageId = "login-update-password.ftl";
 
 type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
 
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, username, isAppInitiatedAction } = kcContext;
+  const { url, username, isAppInitiatedAction, messagesPerField } = kcContext;
   const { msgStr } = i18n;
 
   return layout({
     kcContext,
+    i18n,
     heading: msgStr("updatePasswordTitle"),
+    displayMessage: !messagesPerField.existsError("password", "password-confirm"),
     content: html`
       <form id="kc-passwd-update-form" action=${url.loginAction} method="post">
         <!-- Hidden username/current-password pair so password managers can associate the
@@ -25,7 +27,7 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
           type="text"
           id="username"
           name="username"
-          .value=${username}
+          .value=${username ?? ""}
           autocomplete="username"
           readonly
           style="display:none"
@@ -69,9 +71,7 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
           : null}
         <div class="or-actions">
           ${submitButton(msgStr("doSubmit"))}
-          ${isAppInitiatedAction
-            ? submitButton(msgStr("doCancel"), "cancel-aia", "true", "tertiary")
-            : null}
+          ${isAppInitiatedAction ? cancelButton(msgStr("doCancel")) : null}
         </div>
       </form>
     `

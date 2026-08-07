@@ -1,11 +1,11 @@
 /*
  * Writes the list of login pages this theme implements, for the packaging step to act on.
  *
- * Keycloakify emits a .ftl for all ~39 login pages and routes every one of them into
+ * Keycloakify emits a .ftl for every login page Keycloak has and routes them all into
  * src/main.ts, which would mean owning all 39. We implement the handful in src/pages; for
  * the rest - webauthn, OAuth device grant, recovery codes, organizations, SAML post binding
  * and so on - theme/build.gradle drops the generated template while packaging, so Keycloak
- * resolves those pages through the generated `parent=keycloak` and serves them from its own
+ * resolves those pages through the built theme's `parent=` and serves them from its own
  * theme: complete, translated, and not ours to maintain.
  *
  * The list is derived from src/pages rather than written out by hand, for the same reason

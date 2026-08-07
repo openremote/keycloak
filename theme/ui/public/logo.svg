@@ -1,13 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- OpenRemote logo lockup.
-
-     Mark and wordmark exported directly from the Figma design (OR-manager, Login-logo),
-     placed to its geometry: mark 109.299x109.411 centred, 15px gap, wordmark
-     340.622x54.6002.
-
-     Note these are NOT the assets in ui/component/or-app/images - that wordmark is a
-     lighter, older cut, and all three brand greens have changed
-     (#C1D832/#47A942/#056333 here against #C4D600/#4E9D2D/#1D5632 there). -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340.622 179.011"
      role="img" aria-label="OpenRemote">
   <g transform="translate(115.662,0)">

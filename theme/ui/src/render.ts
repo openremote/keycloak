@@ -7,6 +7,20 @@ import { pages } from "./page-registry";
 export type ThemeOverride = "light" | "dark" | null;
 
 /**
+ * Whether a visitor's own `prefers-color-scheme` puts the page into dark mode.
+ *
+ * Off until the manager has a dark mode of its own. The login page is the first thing a user
+ * sees, and following the OS preference here means a dark login handing over to a light manager -
+ * which reads as a broken page rather than a preference being honoured. The styling itself works
+ * and is not going anywhere: it is the `:root[theme~="dark"]` block `@openremote/theme` already
+ * ships, so turning this back on is the whole change, and the dev rail's dark toggle still
+ * previews it in the meantime.
+ *
+ * index.html repeats this decision inline, before first paint. Change both together.
+ */
+const FOLLOW_SYSTEM_DARK_MODE = false;
+
+/**
  * Reuses the :root[theme~="dark"] block the design system already ships, so there is no
  * second palette to maintain.
  *
@@ -18,10 +32,10 @@ export type ThemeOverride = "light" | "dark" | null;
  * afterwards, including when the dev switcher changes it without reloading.
  */
 export function applyTheme(override: ThemeOverride): void {
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-  const dark = override !== null ? override === "dark" : prefersDark;
+  const prefersDark =
+    FOLLOW_SYSTEM_DARK_MODE && (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
 
-  if (dark) {
+  if (override === "dark" || (override !== "light" && prefersDark)) {
     document.documentElement.setAttribute("theme", "dark");
   } else {
     document.documentElement.removeAttribute("theme");

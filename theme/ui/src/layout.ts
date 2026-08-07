@@ -1,9 +1,15 @@
 import { html, type TemplateResult } from "lit";
 import { html as staticHtml, literal } from "lit/static-html.js";
+// Imported here rather than by the pages: the locale switcher is page chrome, so it appears on
+// every page including ones that render no fields of their own.
+import "@openremote/or-vaadin-components/or-vaadin-select";
+import type { I18n } from "./i18n";
 import type { KcContext } from "./login/KcContext";
 
 export type LayoutOptions = {
   kcContext: KcContext;
+  /** Needed for the shared chrome (locale switcher, "try another way"), not just the page. */
+  i18n: I18n;
   heading: string;
   /**
    * Content grouped with the heading rather than separated from it: prose on
@@ -20,26 +26,50 @@ export type LayoutOptions = {
    * to activate your account". Errors are always shown.
    */
   suppressWarning?: boolean;
+  /**
+   * Whether to render kcContext.message as an alert. Defaults to true.
+   *
+   * This is Keycloak's own `displayMessage` parameter, and it belongs to the page for the same
+   * reason it does there: only the page knows which fields it renders, and therefore whether
+   * the alert would repeat an error already shown against a field. Keycloak's templates each
+   * pass their own expression - login.ftl uses
+   * `!messagesPerField.existsError('username','password')`, register.ftl uses
+   * `messagesPerField.exists('global')` - so pages here mirror theirs.
+   *
+   * It used to be a fixed list of four field names here, which silently duplicated every error
+   * on a field outside that list, and could not work at all once registration became
+   * profile-driven and the field names stopped being knowable in advance.
+   */
+  displayMessage?: boolean;
   content: TemplateResult;
 };
 
 /**
- * Shared card chrome: the brand lockup, the card, and the one place kcContext.message is
- * rendered. Every page goes through it.
+ * Shared card chrome: the brand lockup, the card, the one place kcContext.message is rendered,
+ * and the flow-level controls Keycloak's own template puts around every page. Every page goes
+ * through it.
  */
 export function layout(options: LayoutOptions): TemplateResult {
-  const { kcContext, heading, intro, back, suppressWarning, content } = options;
-  const hasFieldError = kcContext.messagesPerField.existsError(
-    "username",
-    "password",
-    "totp",
-    "email"
-  );
-  const message =
-    suppressWarning && kcContext.message?.type === "warning" ? undefined : kcContext.message;
+  const {
+    kcContext,
+    i18n,
+    heading,
+    intro,
+    back,
+    suppressWarning,
+    displayMessage = true,
+    content
+  } = options;
+  const suppressed = suppressWarning && kcContext.message?.type === "warning";
+  const message = displayMessage && !suppressed ? kcContext.message : undefined;
 
   return html`
     <main class="or-login">
+      <!-- First in the page so it comes first in the tab order; CSS lifts it into the page's
+           top corner, out of the flex flow. It belongs to the page rather than the card
+           because it is not part of any one step of a flow. -->
+      ${localeSwitcher(kcContext, i18n)}
+
       <div class="or-login__brand">
         <img id="or-logo" src="logo.svg" alt="" />
         <p id="or-app-title">${kcContext.realm?.displayName || "OpenRemote"}</p>
@@ -63,19 +93,99 @@ export function layout(options: LayoutOptions): TemplateResult {
 
         <div id="kc-content">
           <div id="kc-content-wrapper">
-            <!-- The one place kcContext.message is rendered. Suppressed when a field-level
-                 error already says the same thing; pages must not render it themselves
-                 either - error.ftl did, and printed every message twice. -->
-            ${message && !hasFieldError
+            <!-- The one place kcContext.message is rendered; pages must not render it
+                 themselves - error.ftl did, and printed every message twice. -->
+            ${message
               ? html`<div class="or-alert or-alert--${message.type}" role="alert">
                   <span>${message.summary}</span>
                 </div>`
               : null}
-            ${content}
+            ${content} ${flowActions(kcContext, i18n)}
           </div>
         </div>
       </div>
     </main>
+  `;
+}
+
+/**
+ * Flow-level actions Keycloak's own template renders around every page.
+ *
+ * Both are plain POSTs back to the current login action, distinguished only by a parameter
+ * Keycloak detects by presence - which is why they are forms rather than links, and why the
+ * hidden native button carries the name/value (see submitButton).
+ *
+ * "Try another way" is the escape hatch out of the authenticator Keycloak picked: without it a
+ * user with, say, both OTP and a passkey has no way to reach the other one.
+ */
+function flowActions(kcContext: KcContext, i18n: I18n): TemplateResult | null {
+  const tryAnotherWay = kcContext.auth?.showTryAnotherWayLink === true;
+  // Not in Keycloakify's KcContext; declared in src/login/KcContext.ts.
+  const switchOrganization = kcContext.switchOrganizationEnabled === true;
+
+  if (!tryAnotherWay && !switchOrganization) {
+    return null;
+  }
+
+  return html`
+    <div class="or-flow-actions">
+      ${tryAnotherWay
+        ? html`<form id="kc-select-try-another-way-form" action=${kcContext.url.loginAction} method="post">
+            ${submitButton(i18n.msgStr("doTryAnotherWay"), "tryAnotherWay", "on", "tertiary")}
+          </form>`
+        : null}
+      ${switchOrganization
+        ? html`<form id="kc-switch-organization-form" action=${kcContext.url.loginAction} method="post">
+            ${submitButton(i18n.msgStr("doSwitchOrganization"), "switchOrganization", "true", "tertiary")}
+          </form>`
+        : null}
+    </div>
+  `;
+}
+
+/**
+ * Language switcher, shown only when the realm actually offers a choice.
+ *
+ * A real `or-vaadin-select` in the page's top corner, so the one control here that is not a
+ * form field still looks and behaves like the rest of the design system - keyboard handling,
+ * the overlay, outside-click and Escape all come from Vaadin. This replaced a hand-rolled menu
+ * button plus `<ul role="menu">`, which also meant this file owned two document-level listeners
+ * and an aria-expanded dance; all of that is gone.
+ *
+ * Keycloak models each language as a GET to its own URL, so the select is a navigation control
+ * rather than a form input: `change` fires only on a real user choice, and the value is the
+ * language tag mapped back to the URL Keycloak gave us.
+ */
+function localeSwitcher(kcContext: KcContext, i18n: I18n): TemplateResult | null {
+  const languages = i18n.enabledLanguages;
+
+  if (!kcContext.realm.internationalizationEnabled || languages.length < 2) {
+    return null;
+  }
+
+  // Keyed as plain strings: languageTag is a union of the 30 tags Keycloak ships, but what
+  // comes back off the select is whatever string it holds.
+  const hrefByTag = new Map<string, string>(
+    languages.map(language => [language.languageTag, language.href])
+  );
+
+  const navigate = (event: Event): void => {
+    const href = hrefByTag.get((event.currentTarget as { value?: string }).value ?? "");
+
+    if (href !== undefined) {
+      location.href = href;
+    }
+  };
+
+  return html`
+    <or-vaadin-select
+      class="or-locale"
+      id="kc-locale"
+      accessible-name=${i18n.msgStr("languages")}
+      .items=${languages.map(language => ({ label: language.label, value: language.languageTag }))}
+      .value=${i18n.currentLanguage.languageTag}
+      @change=${navigate}
+    ></or-vaadin-select>
   `;
 }
 
@@ -112,12 +222,56 @@ export function submitButton(
   value?: string,
   theme: "primary" | "secondary" | "tertiary" = "primary"
 ): TemplateResult {
+  return submit({ label, name, value, theme });
+}
+
+/**
+ * Cancel, for the pages an application can initiate as a required action.
+ *
+ * Keycloak detects the cancel by the presence of `cancel-aia`, which is why the native button
+ * carries the name/value - see submitOwningForm.
+ *
+ * `formnovalidate` is what makes it actually cancel. Vaadin delegates `required` from the
+ * field down onto the native input it manages (InputConstraintsMixin.delegateAttrs), so the
+ * empty form these pages open with is genuinely invalid, and `requestSubmit()` runs interactive
+ * validation before submitting: the browser refused the POST and popped a "please fill out this
+ * field" bubble on a field the user was trying to walk away from. The constraints belong to the
+ * action that submits the data, not to the one that abandons it - which is exactly what
+ * formnovalidate says.
+ */
+export function cancelButton(label: string): TemplateResult {
+  return submit({
+    label,
+    name: "cancel-aia",
+    value: "true",
+    theme: "tertiary",
+    novalidate: true
+  });
+}
+
+type SubmitOptions = {
+  label: string;
+  name?: string;
+  value?: string;
+  theme: "primary" | "secondary" | "tertiary";
+  novalidate?: boolean;
+};
+
+function submit(options: SubmitOptions): TemplateResult {
+  const { label, name, value, theme, novalidate = false } = options;
+
   return html`
     <div class="or-submit">
       <or-vaadin-button class="or-submit__styled" theme=${theme} @click=${submitOwningForm}>
         ${label}
       </or-vaadin-button>
-      <button class="or-submit__fallback" type="submit" name=${name ?? ""} value=${value ?? ""}>
+      <button
+        class="or-submit__fallback"
+        type="submit"
+        name=${name ?? ""}
+        value=${value ?? ""}
+        ?formnovalidate=${novalidate}
+      >
         ${label}
       </button>
     </div>
@@ -151,6 +305,11 @@ export type FieldOptions = {
  * The native <input> and <label> are light-DOM children: Vaadin's SlotController reuses an
  * existing slot="input"/slot="label" rather than creating its own, and LabelMixin documents
  * the slot as taking precedence over the property.
+ *
+ * `autofocus` goes on the component, not the input: the browser only honours the attribute for
+ * elements present as the page is parsed, and these are rendered by script afterwards. Vaadin
+ * reads its own `autofocus` property on the host and focuses the input itself once the component
+ * is ready.
  */
 export function field(options: FieldOptions): TemplateResult {
   const {
@@ -171,7 +330,7 @@ export function field(options: FieldOptions): TemplateResult {
   const tag = TAGS[type];
 
   return staticHtml`
-    <${tag} class="or-field" ?invalid=${!!error}>
+    <${tag} class="or-field" ?invalid=${!!error} ?autofocus=${autofocus}>
       <label slot="label" for=${name}>${label}</label>
       <input
         slot="input"
@@ -180,7 +339,6 @@ export function field(options: FieldOptions): TemplateResult {
         type=${type === "email" ? "email" : type === "password" ? "password" : "text"}
         .value=${value}
         ?required=${required}
-        ?autofocus=${autofocus}
         autocomplete=${autocomplete ?? "off"}
         inputmode=${numeric ? "numeric" : "text"}
         dir=${numeric ? "ltr" : "auto"}
@@ -188,6 +346,57 @@ export function field(options: FieldOptions): TemplateResult {
       ${error ? html`<div slot="error-message">${error}</div>` : null}
     </${tag}>
   `;
+}
+
+/**
+ * What to call the field the user types their identity into.
+ *
+ * Which of the three it is depends on how the realm is configured, and Keycloak's own templates
+ * make exactly this choice in `login.ftl` and `login-reset-password.ftl`. Shared so the two pages
+ * cannot drift: a realm where the label says "Username" on one and "Email" on the other reads as
+ * a bug even though both came from the same rule.
+ */
+export function usernameLabel(
+  realm: { loginWithEmailAllowed?: boolean; registrationEmailAsUsername?: boolean },
+  i18n: I18n
+): string {
+  if (!realm.loginWithEmailAllowed) {
+    return i18n.msgStr("username");
+  }
+
+  if (!realm.registrationEmailAsUsername) {
+    return i18n.msgStr("usernameOrEmail");
+  }
+
+  return i18n.msgStr("email");
+}
+
+/**
+ * Keycloak's `messageHeader`, resolved - or undefined when it cannot be.
+ *
+ * It is a message *key*, not text: Keycloak's own templates render it as
+ * `msg("${messageHeader}")`. Rendering it raw is how the update-password flow ended on a page
+ * headed "accountUpdatedTitle".
+ *
+ * On a real Keycloak the server resolves it: Keycloakify's generated template looks up every
+ * key-shaped string in the context with Keycloak's own msg() and passes the result in
+ * `x-keycloakify.messages`, which advancedMsgStr checks first - so this works for headers
+ * Keycloakify's bundled messages lack, such as accountUpdatedTitle. It only fails for a key the
+ * server has no message for either. advancedMsgStr returns such a key unchanged, which is the
+ * only signal available - so that becomes undefined here, and each page says what it would
+ * rather show than a key.
+ */
+export function resolvedHeading(
+  messageHeader: string | undefined,
+  advancedMsgStr: (key: string) => string
+): string | undefined {
+  if (messageHeader === undefined) {
+    return undefined;
+  }
+
+  const resolved = advancedMsgStr(messageHeader);
+
+  return resolved === messageHeader ? undefined : resolved;
 }
 
 /**
