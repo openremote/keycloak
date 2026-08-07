@@ -16,7 +16,17 @@ Work from the link you were given: node ids change when the file is reorganized,
 
 ## Vaadin components
 
+- Put form state on the component, not the slotted `<input>`. Vaadin manages the slotted input and drops `name`, `value`, `required`, `autocomplete` and `autofocus` from it; only `type`, `inputmode` and `dir` belong there.
+- Where the posted value lives differs per component:
+
+    | component                                | `name` goes on                                       |
+    | ---------------------------------------- | ---------------------------------------------------- |
+    | text, password and email field, checkbox | the host                                             |
+    | text area                                | the slotted `<textarea>`                             |
+    | select, radio group                      | a hidden input kept in sync (see `src/pages/otp.ts`) |
+
 - Vaadin buttons do not take part in forms. Use `submitButton()` and `cancelButton()` from `src/layout.ts`; `cancelButton()` also sets `formnovalidate`, without which required fields block cancelling.
+- Check any form change with `new FormData(form)` in a real browser. A field that posts nothing looks identical on screen.
 - Scope label rules to `label:not([slot])`. Vaadin's own labels are slotted, and an unscoped rule overrides their color.
 
 ## Keycloakify

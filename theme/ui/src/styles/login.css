@@ -46,6 +46,13 @@ body {
   --vaadin-input-field-label-color: var(--or-color-text-secondary);
 }
 
+/* The fields really are required - that is on the component, so the browser validates and
+   assistive tech announces it - but the design marks required-ness with nothing at all, and
+   Lumo's default is a bullet after every label. Hide the indicator, keep the semantics. */
+.or-field::part(required-indicator) {
+  display: none;
+}
+
 /* Painted on html rather than body so the canvas is covered even when the document is
    shorter than the viewport; relying on body-to-canvas propagation left a pale strip
    below the fold. */

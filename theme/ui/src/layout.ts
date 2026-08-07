@@ -302,14 +302,21 @@ export type FieldOptions = {
 /**
  * A labeled input.
  *
- * The native <input> and <label> are light-DOM children: Vaadin's SlotController reuses an
- * existing slot="input"/slot="label" rather than creating its own, and LabelMixin documents
- * the slot as taking precedence over the property.
+ * **`name`, `value`, `required` and `autocomplete` go on the component, not on the input.**
+ * The native <input> is still slotted - Vaadin's SlotController reuses an existing
+ * slot="input" rather than creating its own - but InputControlMixin then *manages* that
+ * element: it replaces the id, drops any name, value, required and autocomplete we set, and
+ * re-delegates its own. Setting them on the input therefore looks right in the source and
+ * silently produces an unnamed field, so the form posts nothing for it. Only `type`,
+ * `inputmode` and `dir` survive on the input itself.
  *
- * `autofocus` goes on the component, not the input: the browser only honours the attribute for
- * elements present as the page is parsed, and these are rendered by script afterwards. Vaadin
- * reads its own `autofocus` property on the host and focuses the input itself once the component
- * is ready.
+ * **`autofocus` goes on the component too**, for a different reason: it survives on the input,
+ * but does nothing there. The browser only honours the attribute for elements present as the page
+ * is parsed, and these are rendered by script afterwards. Vaadin reads its own `autofocus` property
+ * on the host and focuses the input itself once the component is ready. On the input, no field in
+ * this theme ever received focus.
+ *
+ * The label needs no `for`: Vaadin points it at the id it generated, and adds aria-labelledby.
  */
 export function field(options: FieldOptions): TemplateResult {
   const {
@@ -330,16 +337,19 @@ export function field(options: FieldOptions): TemplateResult {
   const tag = TAGS[type];
 
   return staticHtml`
-    <${tag} class="or-field" ?invalid=${!!error} ?autofocus=${autofocus}>
-      <label slot="label" for=${name}>${label}</label>
+    <${tag}
+      class="or-field"
+      name=${name}
+      .value=${value}
+      ?required=${required}
+      autocomplete=${autocomplete ?? "off"}
+      ?invalid=${!!error}
+      ?autofocus=${autofocus}
+    >
+      <label slot="label">${label}</label>
       <input
         slot="input"
-        id=${name}
-        name=${name}
-        type=${type === "email" ? "email" : type === "password" ? "password" : "text"}
-        .value=${value}
-        ?required=${required}
-        autocomplete=${autocomplete ?? "off"}
+        type=${type}
         inputmode=${numeric ? "numeric" : "text"}
         dir=${numeric ? "ltr" : "auto"}
       />
