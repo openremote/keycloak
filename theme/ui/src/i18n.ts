@@ -73,18 +73,19 @@ const ENGLISH_WORDING: Record<string, string> = {
 };
 
 /*
- * Keycloak decorates its back links with a literal "«" in *every* language, and the design
- * draws that chevron in CSS. The English strings above already omit it; this takes it off the
- * other 29 languages, which would otherwise show two chevrons.
+ * Keycloak decorates its navigation links with a literal "«" or "»" in *every* language, and
+ * the design draws that chevron in CSS. The English strings above already omit it; this takes
+ * it off the other 29 languages, which would otherwise show two chevrons.
  */
-const BACK_LINK_KEYS = new Set([
+const DECORATED_LINK_KEYS = new Set([
   "backToLogin",
   "backToApplication",
   "backToLoginCredentials",
-  "backToLoginPage"
+  "backToLoginPage",
+  "proceedWithAction"
 ]);
 
-const LEADING_CHEVRON = /^\s*(?:&laquo;|«)\s*/;
+const LEADING_CHEVRON = /^\s*(?:&laquo;|&raquo;|«|»)\s*/;
 
 function localize(i18n: I18n): I18n {
   const isEnglish = i18n.currentLanguage.languageTag === "en";
@@ -92,7 +93,7 @@ function localize(i18n: I18n): I18n {
   const resolve = (key: string, fallback: () => string): string => {
     const wording = isEnglish ? ENGLISH_WORDING[key] : undefined;
     const message = wording ?? fallback();
-    return BACK_LINK_KEYS.has(key) ? message.replace(LEADING_CHEVRON, "") : message;
+    return DECORATED_LINK_KEYS.has(key) ? message.replace(LEADING_CHEVRON, "") : message;
   };
 
   return {

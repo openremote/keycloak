@@ -19,6 +19,15 @@
         if (dark) {
           document.documentElement.setAttribute("theme", "dark");
         }
+
+        // Per-realm branding (logo, app title, brand color) is fetched at runtime, so keep
+        // the page hidden until it lands - otherwise stock OpenRemote branding paints first
+        // and visibly flips to the realm's own. Released by applyBranding, which also holds
+        // the timeout that guarantees this is never permanent.
+        //
+        // Added from script on purpose: with JavaScript off the class is never applied, so
+        // the rule in login.css cannot hide the page for someone who will never release it.
+        document.documentElement.classList.add("or-booting");
       })();
     </script>
   </head>

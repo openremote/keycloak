@@ -88,7 +88,116 @@ function applyStyles(styles: string | undefined): void {
   );
 }
 
-export async function applyBranding(kcContext: KcContext): Promise<void> {
+/**
+ * Reveals the page, which index.html hid before first paint.
+ *
+ * Idempotent, and called from three places on purpose: as soon as branding has been applied,
+ * on any failure path, and from a timeout - a manager that is slow or unreachable must cost
+ * the user a short delay, never a blank page.
+ */
+function reveal(): void {
+  document.documentElement.classList.remove("or-booting");
+}
+
+/** Long enough for a same-origin fetch on a normal connection, short enough not to be felt. */
+const REVEAL_TIMEOUT_MS = 400;
+
+/**
+ * Points the logo at the realm's own, and waits for it to be ready to paint.
+ *
+ * The wait is the point. Assigning `src` only *starts* a download, and the browser keeps
+ * showing the previous image until the new one decodes - so revealing the page as soon as
+ * applyBranding returned put the stock OpenRemote logo on screen next to the realm's title and
+ * brand color, and swapped it a moment later. That was the flash that survived hiding the page
+ * at all: everything else here (title, color) applies synchronously, and only this did not.
+ *
+ * decode() rejects on a broken or missing image, in which case the default logo stays - the
+ * right outcome, and better than an empty space.
+ */
+async function swapLogo(image: HTMLImageElement, src: string): Promise<void> {
+  image.src = src;
+
+  try {
+    await image.decode();
+  } catch {
+    // Keep whatever is on screen.
+  }
+}
+
+/**
+ * The branding actually applied to a page: resolved, absolute, and small enough to cache.
+ *
+ * Deliberately not the raw manager config - that carries a lot this theme has no use for, and
+ * the logo URL in it is relative to a base only known at fetch time.
+ */
+type Branding = {
+  appTitle?: string;
+  logo?: string;
+  styles?: string;
+};
+
+/*
+ * Repeat visits should not wait on the network.
+ *
+ * Branding is fetched from the manager on every page load, and until it arrives the page is
+ * hidden - so every login, every failed login and every step of a 2FA flow paid a round trip
+ * of blank screen. It changes about never, so the last known value is kept per realm and
+ * applied immediately, with the fetch continuing in the background to pick up changes.
+ *
+ * The version in the key is the cache-buster for this *shape*: change Branding and old entries
+ * are ignored rather than half-read. Changes to the branding itself are picked up by the
+ * revalidation below, which compares and re-applies.
+ */
+const CACHE_VERSION = "v1";
+
+function cacheKey(realm: string): string {
+  return `or-branding:${CACHE_VERSION}:${realm}`;
+}
+
+function readCache(realm: string): Branding | undefined {
+  try {
+    const raw = localStorage.getItem(cacheKey(realm));
+    return raw === null ? undefined : (JSON.parse(raw) as Branding);
+  } catch {
+    // Storage disabled, or a value we can no longer parse. Treat as a miss.
+    return undefined;
+  }
+}
+
+function writeCache(realm: string, branding: Branding | undefined): void {
+  try {
+    if (branding === undefined) {
+      localStorage.removeItem(cacheKey(realm));
+    } else {
+      localStorage.setItem(cacheKey(realm), JSON.stringify(branding));
+    }
+  } catch {
+    // Private mode, quota, storage disabled: caching is an optimisation, not a requirement.
+  }
+}
+
+/** Applies resolved branding to the page. Everything here is idempotent. */
+async function apply(branding: Branding): Promise<void> {
+  if (branding.appTitle) {
+    document.title = branding.appTitle;
+    const title = document.getElementById("or-app-title");
+
+    if (title) {
+      title.textContent = branding.appTitle;
+    }
+  }
+
+  applyStyles(branding.styles);
+
+  const logoEl = document.getElementById("or-logo") as HTMLImageElement | null;
+
+  if (branding.logo && logoEl) {
+    await swapLogo(logoEl, branding.logo);
+  }
+}
+
+/** Fetches the realm's branding from the manager, or undefined if there is none to apply. */
+async function fetchBranding(kcContext: KcContext): Promise<Branding | undefined> {
   const realm: string | undefined = kcContext.realm?.name;
 
   /*
@@ -100,49 +209,74 @@ export async function applyBranding(kcContext: KcContext): Promise<void> {
   const managerUrl = (kcContext.properties?.OR_MANAGER_URL ?? "").replace(/\/+$/, "");
 
   if (!realm) {
-    return;
+    return undefined;
+  }
+
+  // credentials:"omit" is required: the manager sets corsAllowCredentials=true while
+  // returning Access-Control-Allow-Origin:* in dev mode, which browsers reject for
+  // credentialed requests. The endpoint is public.
+  const response = await fetch(
+    `${managerUrl}/api/${encodeURIComponent(realm)}/configuration/manager`,
+    { credentials: "omit" }
+  );
+
+  if (!response.ok) {
+    return undefined;
+  }
+
+  const config = await response.json();
+  const realmConfig = config.realms?.[realm] ?? config.realms?.default;
+
+  if (!realmConfig) {
+    return undefined;
+  }
+
+  // Keycloak has one fixed hostname while the manager may be reached from several, so
+  // prefer the canonical URL the config itself reports.
+  const base = config.manager?.managerUrl || managerUrl || location.origin;
+
+  return {
+    appTitle: realmConfig.appTitle,
+    logo: resolveAsset(realmConfig.logo, base) ?? undefined,
+    styles: realmConfig.styles
+  };
+}
+
+export async function applyBranding(kcContext: KcContext): Promise<void> {
+  const realm: string | undefined = kcContext.realm?.name;
+  const cached = realm === undefined ? undefined : readCache(realm);
+
+  setTimeout(reveal, REVEAL_TIMEOUT_MS);
+
+  /*
+   * With a cached value the page can be shown before the network is consulted at all. The
+   * logo is still awaited, but it is an HTTP cache hit from the previous visit, so this is
+   * effectively instant - and it keeps the one rule that matters: never reveal a page whose
+   * logo has not painted yet.
+   */
+  if (cached) {
+    await apply(cached);
+    reveal();
   }
 
   try {
-    // credentials:"omit" is required: the manager sets corsAllowCredentials=true while
-    // returning Access-Control-Allow-Origin:* in dev mode, which browsers reject for
-    // credentialed requests. The endpoint is public.
-    const response = await fetch(
-      `${managerUrl}/api/${encodeURIComponent(realm)}/configuration/manager`,
-      { credentials: "omit" }
-    );
+    const fresh = await fetchBranding(kcContext);
 
-    if (!response.ok) {
-      return;
+    if (realm !== undefined) {
+      writeCache(realm, fresh);
     }
 
-    const config = await response.json();
-    const realmConfig = config.realms?.[realm] ?? config.realms?.default;
-
-    if (!realmConfig) {
-      return;
+    /*
+     * Only re-apply when something actually changed, so the common case does no DOM work and
+     * cannot flicker. When it has changed, this page shows the old branding briefly and then
+     * updates; every later load is correct from the first paint.
+     */
+    if (fresh && JSON.stringify(fresh) !== JSON.stringify(cached)) {
+      await apply(fresh);
     }
-
-    // Keycloak has one fixed hostname while the manager may be reached from several, so
-    // prefer the canonical URL the config itself reports.
-    const base = config.manager?.managerUrl || managerUrl || location.origin;
-
-    if (realmConfig.appTitle) {
-      document.title = realmConfig.appTitle;
-      const title = document.getElementById("or-app-title");
-      if (title) {
-        title.textContent = realmConfig.appTitle;
-      }
-    }
-
-    const logo = resolveAsset(realmConfig.logo, base);
-    const logoEl = document.getElementById("or-logo") as HTMLImageElement | null;
-    if (logo && logoEl) {
-      logoEl.src = logo;
-    }
-
-    applyStyles(realmConfig.styles);
   } catch {
-    // No manager reachable, or no config for this realm: keep the stock branding.
+    // No manager reachable: keep whatever is on screen, cached or stock.
+  } finally {
+    reveal();
   }
 }

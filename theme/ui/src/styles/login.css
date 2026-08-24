@@ -14,9 +14,10 @@
  * Boot
  * ------------------------------------------------------------------------ */
 
-/* Hidden only until branding.js resolves, so the stock palette does not flash before
-   the realm's own. Released by branding.js, by a timeout in template.ftl, or by the
-   <noscript> rule there. */
+/* Hidden only until the realm's branding lands, so the stock logo, title and palette do not
+   paint and then visibly flip. The class is added by the inline script in index.html and
+   removed by applyBranding (see src/branding.ts), which also holds the timeout that stops
+   this ever being permanent. Never applied at all when JavaScript is off. */
 html.or-booting body {
   visibility: hidden;
 }

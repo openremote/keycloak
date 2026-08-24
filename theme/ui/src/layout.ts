@@ -20,6 +20,11 @@ export type LayoutOptions = {
    * to activate your account". Errors are always shown.
    */
   suppressWarning?: boolean;
+  /**
+   * Drop the message entirely. For pages where kcContext.message *is* the page - info.ftl,
+   * whose summary reads as the heading - rendering it again as an alert just says it twice.
+   */
+  suppressMessage?: boolean;
   content: TemplateResult;
 };
 
@@ -28,15 +33,18 @@ export type LayoutOptions = {
  * rendered. Every page goes through it.
  */
 export function layout(options: LayoutOptions): TemplateResult {
-  const { kcContext, heading, intro, back, suppressWarning, content } = options;
+  const { kcContext, heading, intro, back, suppressWarning, suppressMessage, content } = options;
   const hasFieldError = kcContext.messagesPerField.existsError(
     "username",
     "password",
     "totp",
     "email"
   );
-  const message =
-    suppressWarning && kcContext.message?.type === "warning" ? undefined : kcContext.message;
+  const message = suppressMessage
+    ? undefined
+    : suppressWarning && kcContext.message?.type === "warning"
+      ? undefined
+      : kcContext.message;
 
   return html`
     <main class="or-login">
