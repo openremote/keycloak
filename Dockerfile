@@ -2,7 +2,7 @@
 # Keycloak image built for postgresql support with theme handling customisation
 # to always fallback to standard openremote theme.
 # ------------------------------------------------------------------------------------
-ARG VERSION=26.7.0
+ARG VERSION=26.7.3
 
 ARG KC_HEALTH_ENABLED=true
 ARG KC_METRICS_ENABLED=true
