@@ -29,14 +29,16 @@ function syncSelectedCredential(event: Event): void {
 
 /** 2FA login. */
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, otpLogin } = kcContext;
+  const { url, otpLogin, messagesPerField } = kcContext;
   const { msgStr } = i18n;
   const credentials = otpLogin.userOtpCredentials;
   const selectedCredentialId = otpLogin.selectedCredentialId ?? credentials[0]?.id ?? "";
 
   return layout({
     kcContext,
+    i18n,
     heading: msgStr("loginAccountTitle"),
+    displayMessage: !messagesPerField.existsError("totp"),
     back: { href: url.loginRestartFlowUrl, label: msgStr("backToLoginCredentials") },
     content: html`
       <form id="kc-otp-login-form" action=${url.loginAction} method="post">

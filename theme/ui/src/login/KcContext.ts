@@ -16,6 +16,12 @@ import type { ExtendKcContext } from "keycloakify/login";
 export type KcContextExtension = {
   themeName: string;
   properties: Record<string, string | undefined>;
+  /**
+   * Set by Keycloak when the user is mid-flow in an organization that offers others to switch
+   * to. Keycloakify does not model it yet, but its own template.ftl renders the control, so
+   * without this the option simply disappears.
+   */
+  switchOrganizationEnabled?: boolean;
 };
 
 /*

@@ -1,21 +1,44 @@
 import { html, type TemplateResult } from "lit";
-import "@openremote/or-vaadin-components/or-vaadin-text-field";
 import "@openremote/or-vaadin-components/or-vaadin-password-field";
-import "@openremote/or-vaadin-components/or-vaadin-email-field";
+import "@openremote/or-vaadin-components/or-vaadin-checkbox";
 import "@openremote/or-vaadin-components/or-vaadin-button";
 import type { I18n } from "../i18n";
 import type { KcContext } from "../login/KcContext";
-import { field, layout, submitButton } from "../layout";
+import { errorOf, field, layout, submitButton } from "../layout";
+import { profileField } from "../profile";
 
 export const pageId = "register.ftl";
 
 type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
 
 /*
+ * Invisible reCAPTCHA calls back by *name* on the global object once it has a token, and only
+ * then may the form be submitted. A <script> tag written into a Lit template would never run -
+ * scripts inserted as parsed HTML are inert - so the callback is installed here instead.
+ *
+ * form.submit() rather than requestSubmit() matches Keycloak's own register.ftl.
+ */
+declare global {
+  interface Window {
+    onSubmitRecaptcha?: () => void;
+  }
+}
+
+function installRecaptchaCallback(): void {
+  window.onSubmitRecaptcha = () => {
+    const form = document.getElementById("kc-register-form");
+
+    if (form instanceof HTMLFormElement) {
+      form.submit();
+    }
+  };
+}
+
+/*
  * Driven by Keycloak's user profile (kcContext.profile.attributesByName) rather than a
- * hardcoded field list. That is how registration actually works from Keycloak 24 onwards:
- * the realm's User Profile configuration decides which attributes exist, whether they are
- * required, and their input type.
+ * hardcoded field list. That is how registration works from Keycloak 24 onwards: the realm's
+ * User Profile configuration decides which attributes exist, whether they are required, and
+ * how each is rendered. src/profile.ts does the rendering; this file is the page around it.
  */
 
 /*
@@ -35,8 +58,20 @@ function inDesignOrder<T extends { name: string }>(attributes: T[]): T[] {
 }
 
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, realm, locale, profile, passwordRequired, recaptchaRequired, recaptchaSiteKey } =
-    kcContext;
+  const {
+    url,
+    realm,
+    locale,
+    profile,
+    passwordRequired,
+    termsAcceptanceRequired,
+    recaptchaRequired,
+    recaptchaVisible,
+    recaptchaSiteKey,
+    recaptchaAction,
+    messageHeader,
+    messagesPerField
+  } = kcContext;
   const { msgStr, advancedMsgStr } = i18n;
   const attributes = inDesignOrder(Object.values(profile.attributesByName));
 
@@ -50,9 +85,21 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
   const isCarriedLocale = (name: string): boolean =>
     name === "locale" && !!realm.internationalizationEnabled && !!locale?.currentLanguageTag;
 
+  const termsError = errorOf(kcContext, "termsAccepted");
+  const invisibleRecaptcha = !!recaptchaRequired && !recaptchaVisible;
+
+  if (invisibleRecaptcha) {
+    installRecaptchaCallback();
+  }
+
   return layout({
     kcContext,
-    heading: msgStr("registerTitle"),
+    i18n,
+    heading: messageHeader ? advancedMsgStr(messageHeader) : msgStr("registerTitle"),
+    /* Keycloak's own register.ftl uses exactly this: every field renders its own error, and
+       with a profile-driven form the field names are not knowable in advance, so only
+       genuinely global messages belong in the alert. */
+    displayMessage: messagesPerField.exists("global"),
     back: { href: url.loginUrl, label: msgStr("backToLogin") },
     content: html`
       <form id="kc-register-form" action=${url.registrationAction} method="post">
@@ -61,7 +108,7 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
         <input type="text" readonly value="this is not a login form" style="display:none" />
         <input type="password" readonly value="this is not a login form" style="display:none" />
 
-        ${attributes.map(attribute =>
+        ${attributes.map((attribute, index) =>
           isCarriedLocale(attribute.name)
             ? html`<input
                 type="hidden"
@@ -69,18 +116,7 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
                 name="locale"
                 .value=${locale?.currentLanguageTag ?? ""}
               />`
-            : field({
-                kcContext,
-                name: attribute.name,
-                /* displayName is a message key wrapped as ${...} for the built-in attributes
-                   and free text for anything a realm has added; advancedMsgStr handles both,
-                   and falls back to the attribute name when there is neither. */
-                label: advancedMsgStr(attribute.displayName ?? attribute.name),
-                type: attribute.name === "email" ? "email" : "text",
-                value: attribute.value,
-                required: attribute.required,
-                autocomplete: attribute.autocomplete
-              })
+            : profileField({ kcContext, i18n, attribute, autofocus: index === 0 })
         )}
         ${passwordRequired
           ? html`
@@ -89,7 +125,8 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
                 name: "password",
                 label: msgStr("password"),
                 type: "password",
-                autocomplete: "new-password"
+                autocomplete: "new-password",
+                errorFields: ["password", "password-confirm"]
               })}
               ${field({
                 kcContext,
@@ -100,14 +137,63 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
               })}
             `
           : null}
-        ${recaptchaRequired
-          ? html`<div
-              class="or-recaptcha g-recaptcha"
-              data-size="compact"
-              data-sitekey=${recaptchaSiteKey}
-            ></div>`
+
+        <!-- Terms are a realm setting, not a profile attribute, so they arrive separately.
+             Without this control a realm that requires terms cannot be registered against at
+             all: Keycloak rejects the POST for a missing termsAccepted it never asked for. -->
+        ${termsAcceptanceRequired
+          ? html`
+              <div class="or-terms">
+                <p class="or-terms__title">${msgStr("termsTitle")}</p>
+                <div class="or-terms__text">${advancedMsgStr("termsText")}</div>
+                <or-vaadin-checkbox
+                  class="or-field"
+                  name="termsAccepted"
+                  value="on"
+                  ?invalid=${!!termsError}
+                >
+                  <label slot="label">${msgStr("acceptTerms")}</label>
+                  <input slot="input" type="checkbox" />
+                  ${termsError ? html`<div slot="error-message">${termsError}</div>` : null}
+                </or-vaadin-checkbox>
+              </div>
+            `
           : null}
-        ${submitButton(msgStr("doRegister"), "register")}
+        ${recaptchaRequired && recaptchaVisible === true
+          ? html`<div class="or-recaptcha g-recaptcha" data-sitekey=${recaptchaSiteKey}></div>`
+          : null}
+
+        <!--
+          Invisible reCAPTCHA is a property of the *button*: grecaptcha intercepts the click,
+          solves the challenge and then calls back to submit. That is why the submit control is
+          spelled out here rather than going through submitButton() - it needs the g-recaptcha
+          class and data-* hooks on the element grecaptcha binds to.
+        -->
+        ${invisibleRecaptcha
+          ? html`
+              <div class="or-submit">
+                <or-vaadin-button
+                  class="or-submit__styled g-recaptcha"
+                  theme="primary"
+                  data-sitekey=${recaptchaSiteKey}
+                  data-callback=${"onSubmitRecaptcha"}
+                  data-action=${recaptchaAction}
+                >
+                  ${msgStr("doRegister")}
+                </or-vaadin-button>
+                <button
+                  class="or-submit__fallback g-recaptcha"
+                  type="submit"
+                  name="register"
+                  data-sitekey=${recaptchaSiteKey}
+                  data-callback=${"onSubmitRecaptcha"}
+                  data-action=${recaptchaAction}
+                >
+                  ${msgStr("doRegister")}
+                </button>
+              </div>
+            `
+          : submitButton(msgStr("doRegister"), "register")}
       </form>
     `
   });

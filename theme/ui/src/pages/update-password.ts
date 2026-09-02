@@ -11,12 +11,14 @@ export const pageId = "login-update-password.ftl";
 type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
 
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, username, isAppInitiatedAction } = kcContext;
+  const { url, username, isAppInitiatedAction, messagesPerField } = kcContext;
   const { msgStr } = i18n;
 
   return layout({
     kcContext,
+    i18n,
     heading: msgStr("updatePasswordTitle"),
+    displayMessage: !messagesPerField.existsError("password", "password-confirm"),
     content: html`
       <form id="kc-passwd-update-form" action=${url.loginAction} method="post">
         <!-- Hidden username/current-password pair so password managers can associate the

@@ -28,6 +28,8 @@ const { getI18n: getI18n_base, ofTypeI18n } = i18nBuilder
       backToLoginCredentials: "Back to login credentials",
       select2faDevice: "Select your 2FA device",
       identityProviderLoginLabel: "Or continue with",
+      // Keycloak renders this control but ships no message for it.
+      doSwitchOrganization: "Switch organization",
       // Fallback label for an OTP credential the user saved without naming it.
       otpDeviceFallback: "Device {0}"
     }

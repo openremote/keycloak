@@ -63,6 +63,17 @@ from Figma (`Login-logo`). In production the logo comes from `manager_config.jso
 - Setting `required` on the component makes Lumo render a bullet after the label. The design has
   no required markers, so `login.css` hides `::part(required-indicator)` — semantics kept,
   indicator gone.
+- **The rule is per component. Check each one with `new FormData(form)`.** There is no
+  consistent contract; every variation below is real and was found only by measuring:
+
+  | component | where `name` goes | why |
+  |---|---|---|
+  | text / password / email field | **host** | manages the slotted input, drops its attributes |
+  | checkbox | **host** | same |
+  | **text area** | **the slotted `<textarea>`** | reuses it *without* managing it, so the host is ignored |
+  | **select** | **a hidden input you sync** | renders a button + overlay; no form control at all |
+  | **radio group** | **a hidden input you sync** | renames every radio it owns, resets values to `"on"` |
+
 - **Two components go further and destroy what you slot in:**
   - **Buttons.** Vaadin's button is `role="button"` with no `type` and no form participation,
     and its Lumo styling is `:host`-scoped inside `@media lumo_components_button` so it cannot
@@ -153,6 +164,8 @@ from Figma (`Login-logo`). In production the logo comes from `manager_config.jso
   padding-less wrappers. Use `padding-top`.
 - `#kc-content` and `#kc-content-wrapper` are `display: contents` so the card's gap reaches
   the real content rather than a single pass-through div.
+- A backtick in a comment *inside* an `html` template ends the template — same trap as `${}`
+  there. Write "the name attribute", not the code-quoted form.
 - **Do not put load-bearing layout behind `:has()`** — it was silently the difference between
   a 16px and a 33px gap. We render the markup; a modifier class cannot fail that way.
   (Progressive enhancement like `:has(> or-vaadin-button:defined)` is fine.)

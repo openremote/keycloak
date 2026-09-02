@@ -11,7 +11,7 @@ export const pageId = "login-reset-password.ftl";
 type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
 
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, realm, auth } = kcContext;
+  const { url, realm, auth, messagesPerField } = kcContext;
   const { msgStr } = i18n;
 
   const label = !realm.loginWithEmailAllowed
@@ -22,7 +22,9 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
 
   return layout({
     kcContext,
+    i18n,
     heading: msgStr("emailForgotTitle"),
+    displayMessage: !messagesPerField.existsError("username"),
     intro: msgStr("emailInstruction"),
     back: { href: url.loginUrl, label: msgStr("backToLogin") },
     content: html`

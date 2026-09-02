@@ -52,8 +52,10 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
 
   return layout({
     kcContext,
+    i18n,
     heading,
-    suppressMessage: true,
+    // The heading carries message.summary, so the alert would say it twice.
+    displayMessage: false,
     // Only when it would not simply repeat the heading.
     intro: messageHeader && message.summary !== messageHeader ? message.summary : undefined,
     content: html`

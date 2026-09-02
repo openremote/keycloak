@@ -1,4 +1,5 @@
 import { html, type TemplateResult } from "lit";
+import type { I18n } from "./i18n";
 import type { KcContext } from "./login/KcContext";
 import { layout } from "./layout";
 
@@ -13,9 +14,10 @@ import { layout } from "./layout";
  * What this is actually for is the dev harness, whose page switcher lists the unimplemented
  * pages so you can see at a glance what is being inherited rather than owned.
  */
-export function fallbackPage(kcContext: KcContext): TemplateResult {
+export function fallbackPage(kcContext: KcContext, i18n: I18n): TemplateResult {
   return layout({
     kcContext,
+    i18n,
     heading: "Not implemented here",
     content: html`
       <div class="or-alert or-alert--warning" role="alert">

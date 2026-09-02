@@ -23,7 +23,7 @@ type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
  * not documentation, and the compiler will try to evaluate it.
  */
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, totp, mode, isAppInitiatedAction } = kcContext;
+  const { url, totp, mode, isAppInitiatedAction, messagesPerField } = kcContext;
   const { msgStr, advancedMsgStr } = i18n;
 
   const installStep = html`
@@ -101,7 +101,9 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
 
   return layout({
     kcContext,
+    i18n,
     heading: msgStr("loginTotpTitle"),
+    displayMessage: !messagesPerField.existsError("totp", "userLabel"),
     // Keycloak warns "You need to set up Mobile Authenticator to activate your account",
     // which the heading and steps below already say and the design has no banner for.
     suppressWarning: true,

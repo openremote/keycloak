@@ -1,9 +1,12 @@
 import { html, type TemplateResult } from "lit";
 import { html as staticHtml, literal } from "lit/static-html.js";
+import type { I18n } from "./i18n";
 import type { KcContext } from "./login/KcContext";
 
 export type LayoutOptions = {
   kcContext: KcContext;
+  /** Needed for the shared chrome (locale switcher, "try another way"), not just the page. */
+  i18n: I18n;
   heading: string;
   /**
    * Content grouped with the heading rather than separated from it: prose on
@@ -21,26 +24,40 @@ export type LayoutOptions = {
    */
   suppressWarning?: boolean;
   /**
-   * Drop the message entirely. For pages where kcContext.message *is* the page - info.ftl,
-   * whose summary reads as the heading - rendering it again as an alert just says it twice.
+   * Whether to render kcContext.message as an alert. Defaults to true.
+   *
+   * This is Keycloak's own `displayMessage` parameter, and it belongs to the page for the same
+   * reason it does there: only the page knows which fields it renders, and therefore whether
+   * the alert would repeat an error already shown against a field. Keycloak's templates each
+   * pass their own expression - login.ftl uses
+   * `!messagesPerField.existsError('username','password')`, register.ftl uses
+   * `messagesPerField.exists('global')` - so pages here mirror theirs.
+   *
+   * It used to be a fixed list of four field names here, which silently duplicated every error
+   * on a field outside that list, and could not work at all once registration became
+   * profile-driven and the field names stopped being knowable in advance.
    */
-  suppressMessage?: boolean;
+  displayMessage?: boolean;
   content: TemplateResult;
 };
 
 /**
- * Shared card chrome: the brand lockup, the card, and the one place kcContext.message is
- * rendered. Every page goes through it.
+ * Shared card chrome: the brand lockup, the card, the one place kcContext.message is rendered,
+ * and the flow-level controls Keycloak's own template puts around every page. Every page goes
+ * through it.
  */
 export function layout(options: LayoutOptions): TemplateResult {
-  const { kcContext, heading, intro, back, suppressWarning, suppressMessage, content } = options;
-  const hasFieldError = kcContext.messagesPerField.existsError(
-    "username",
-    "password",
-    "totp",
-    "email"
-  );
-  const message = suppressMessage
+  const {
+    kcContext,
+    i18n,
+    heading,
+    intro,
+    back,
+    suppressWarning,
+    displayMessage = true,
+    content
+  } = options;
+  const message = !displayMessage
     ? undefined
     : suppressWarning && kcContext.message?.type === "warning"
       ? undefined
@@ -71,19 +88,86 @@ export function layout(options: LayoutOptions): TemplateResult {
 
         <div id="kc-content">
           <div id="kc-content-wrapper">
-            <!-- The one place kcContext.message is rendered. Suppressed when a field-level
-                 error already says the same thing; pages must not render it themselves
-                 either - error.ftl did, and printed every message twice. -->
-            ${message && !hasFieldError
+            <!-- The one place kcContext.message is rendered; pages must not render it
+                 themselves - error.ftl did, and printed every message twice. -->
+            ${message
               ? html`<div class="or-alert or-alert--${message.type}" role="alert">
                   <span>${message.summary}</span>
                 </div>`
               : null}
-            ${content}
+            ${content} ${flowActions(kcContext, i18n)}
           </div>
         </div>
+        ${localeSwitcher(kcContext, i18n)}
       </div>
     </main>
+  `;
+}
+
+/**
+ * Flow-level actions Keycloak's own template renders around every page.
+ *
+ * Both are plain POSTs back to the current login action, distinguished only by a parameter
+ * Keycloak detects by presence - which is why they are forms rather than links, and why the
+ * hidden native button carries the name/value (see submitButton).
+ *
+ * "Try another way" is the escape hatch out of the authenticator Keycloak picked: without it a
+ * user with, say, both OTP and a passkey has no way to reach the other one.
+ */
+function flowActions(kcContext: KcContext, i18n: I18n): TemplateResult | null {
+  const tryAnotherWay = kcContext.auth?.showTryAnotherWayLink === true;
+  // Not in Keycloakify's KcContext; declared in src/login/KcContext.ts.
+  const switchOrganization = kcContext.switchOrganizationEnabled === true;
+
+  if (!tryAnotherWay && !switchOrganization) {
+    return null;
+  }
+
+  return html`
+    <div class="or-flow-actions">
+      ${tryAnotherWay
+        ? html`<form id="kc-select-try-another-way-form" action=${kcContext.url.loginAction} method="post">
+            ${submitButton(i18n.msgStr("doTryAnotherWay"), "tryAnotherWay", "on", "tertiary")}
+          </form>`
+        : null}
+      ${switchOrganization
+        ? html`<form id="kc-switch-organization-form" action=${kcContext.url.loginAction} method="post">
+            ${submitButton(i18n.msgStr("doSwitchOrganization"), "switchOrganization", "true", "tertiary")}
+          </form>`
+        : null}
+    </div>
+  `;
+}
+
+/**
+ * Language switcher, shown only when the realm actually offers a choice.
+ *
+ * Keycloak renders this as a dropdown in the header; here it sits at the foot of the card as a
+ * plain row of links, which is what its `href` values are - a GET per language, no JavaScript.
+ */
+function localeSwitcher(kcContext: KcContext, i18n: I18n): TemplateResult | null {
+  const supported = kcContext.locale?.supported ?? [];
+
+  if (!kcContext.realm.internationalizationEnabled || supported.length < 2) {
+    return null;
+  }
+
+  return html`
+    <nav class="or-locales" aria-label=${i18n.msgStr("languages")}>
+      ${supported.map(
+        entry => html`
+          <a
+            class="or-link"
+            href=${entry.url}
+            lang=${entry.languageTag}
+            aria-current=${entry.languageTag === kcContext.locale?.currentLanguageTag
+              ? "true"
+              : "false"}
+            >${entry.label}</a
+          >
+        `
+      )}
+    </nav>
   `;
 }
 

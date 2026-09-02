@@ -587,3 +587,86 @@ or-vaadin-button:not(:defined) {
   }
 }
 
+
+/* --------------------------------------------------------------------------
+ * Flow controls and profile-driven fields
+ * ------------------------------------------------------------------------ */
+
+/* "Try another way" / "Switch organization": Keycloak renders these around every page, so
+   they sit below the form as a quiet group rather than competing with its primary action. */
+.or-flow-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Language switcher. A plain row of links, because that is what Keycloak gives us - one URL
+   per language - and it needs no JavaScript to work. */
+.or-locales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  justify-content: center;
+  font-size: 0.875rem;
+}
+
+.or-locales a[aria-current="true"] {
+  color: var(--or-color-text-secondary);
+  text-decoration: underline;
+}
+
+/* Helper text a realm can attach to any user profile attribute. */
+.or-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.or-field-help {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--or-color-text-secondary);
+}
+
+.or-field-error {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--or-color-text-error);
+}
+
+/* Multi-value profile attributes: a real fieldset, so the group has one accessible name. */
+.or-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.or-checkboxes legend {
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--or-color-text-secondary);
+}
+
+/* Terms and conditions, shown above the acceptance checkbox when the realm requires them. */
+.or-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.or-terms__title {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* Realm-authored prose of unknown length; keep it from pushing the card off-screen. */
+.or-terms__text {
+  max-height: 12rem;
+  overflow-y: auto;
+  font-size: 0.875rem;
+  color: var(--or-color-text-secondary);
+}
