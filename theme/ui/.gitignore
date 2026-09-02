@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build_keycloak/
+src/kc.gen.tsx
+
+# Yarn, matching the openremote monorepo's .gitignore.
+# .yarn/install-state.gz is a machine-local resolution cache that Yarn rewrites on install
+# and on any command that has to resolve the project - yarn.lock is the source of truth.
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions

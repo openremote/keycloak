@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>OpenRemote</title>
+    <script>
+      // Resolve the color scheme before first paint, so a dark page never flashes light
+      // while the bundle boots. main.ts applies the same rule once it runs; this only moves
+      // the first application earlier. ?theme= is a dev-only override.
+      (function () {
+        var override = new URLSearchParams(location.search).get("theme");
+        var dark =
+          override === "dark" ||
+          (override !== "light" &&
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) {
+          document.documentElement.setAttribute("theme", "dark");
+        }
+
+        // Per-realm branding (logo, app title, brand color) is fetched at runtime, so keep
+        // the page hidden until it lands - otherwise stock OpenRemote branding paints first
+        // and visibly flips to the realm's own. Released by applyBranding, which also holds
+        // the timeout that guarantees this is never permanent.
+        //
+        // Added from script on purpose: with JavaScript off the class is never applied, so
+        // the rule in login.css cannot hide the page for someone who will never release it.
+        document.documentElement.classList.add("or-booting");
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

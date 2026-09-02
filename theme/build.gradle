@@ -6,6 +6,129 @@ base {
     archivesName = "openremote-theme-provider"
 }
 
+// ---------------------------------------------------------------------------
+// OpenRemote theme provider
+//
+// The jar carries two Keycloak themes, both named "openremote" (see
+// src/main/resources/META-INF/keycloak-themes.json):
+//
+//   login - built from ui/, a Keycloakify project. TypeScript and Lit render
+//           @openremote/or-vaadin-components, rspack bundles it, and Keycloakify wraps the
+//           result in the FreeMarker templates Keycloak serves.
+//   email - plain FreeMarker in src/main/resources, untouched by any of the above.
+//
+// Building needs `node` and Apache Maven on the PATH; Keycloakify shells out to Maven to
+// produce its jar, and refuses to run without it.
+// ---------------------------------------------------------------------------
+
+def uiDir = file('ui')
+def uiBuildDir = new File(uiDir, 'build_keycloak')
+
+// The only jar target enabled in ui/package.json, so this name is fixed.
+def uiJar = new File(uiBuildDir, 'keycloak-theme-for-kc-all-other-versions.jar')
+
+// Written by ui/scripts/write-implemented-pages.mjs, one .ftl basename per line.
+def implementedPagesFile = new File(uiBuildDir, 'implemented-pages.txt')
+
+def unpackedThemeDir = layout.buildDirectory.dir('login-theme').get().asFile
+
+// Merged into the generated message bundle rather than shipped as a resource of their own;
+// see the doLast below and the file's own header.
+def messageOverridesDir = file('src/main/messages')
+
+// Yarn is invoked through the release committed under ui/.yarn/releases rather than through
+// corepack, so the build needs nothing on the PATH beyond node itself.
+def yarnJs = fileTree(new File(uiDir, '.yarn/releases')) { include '*.cjs' }.singleFile
+
+tasks.register('installUiDependencies', Exec) {
+    description = "Installs the login theme's npm dependencies"
+    group = 'build'
+
+    workingDir uiDir
+    commandLine 'node', yarnJs, 'install', '--immutable'
+
+    inputs.file(new File(uiDir, 'package.json'))
+    inputs.file(new File(uiDir, 'yarn.lock'))
+    outputs.dir(new File(uiDir, 'node_modules'))
+}
+
+tasks.register('buildLoginTheme', Exec) {
+    description = 'Bundles the login theme and wraps it in Keycloak templates'
+    group = 'build'
+
+    dependsOn 'installUiDependencies'
+
+    workingDir uiDir
+    commandLine 'node', yarnJs, 'build-keycloak-theme'
+
+    inputs.dir(new File(uiDir, 'src'))
+    inputs.dir(new File(uiDir, 'public'))
+    inputs.dir(new File(uiDir, 'scripts'))
+    inputs.file(new File(uiDir, 'index.html'))
+    inputs.file(new File(uiDir, 'package.json'))
+    inputs.file(new File(uiDir, 'rspack.config.mjs'))
+    inputs.file(new File(uiDir, 'tsconfig.json'))
+    outputs.file(uiJar)
+    outputs.file(implementedPagesFile)
+}
+
+/*
+ * Keycloakify deletes its resources tree once it has jarred it, so the jar is the only thing
+ * left to work from. Unpacking it here rather than shipping it as-is lets this module own the
+ * two things Keycloakify cannot know about:
+ *
+ *   - the theme descriptor, which has to declare the email theme as well as the login one
+ *   - which pages we actually implement; the rest are dropped so that Keycloak resolves them
+ *     through the generated `parent=keycloak` and serves them from its own theme
+ */
+tasks.register('unpackLoginTheme', Sync) {
+    description = 'Unpacks the built login theme, dropping the pages Keycloak will serve itself'
+    group = 'build'
+
+    dependsOn 'buildLoginTheme'
+
+    from(zipTree(uiJar)) {
+        exclude 'META-INF/**'
+    }
+    into unpackedThemeDir
+
+    eachFile { details ->
+        if (!details.name.endsWith('.ftl')) {
+            return
+        }
+        def implemented = implementedPagesFile.readLines().findAll { !it.isBlank() } as Set
+        if (!implemented.contains(details.name)) {
+            details.exclude()
+        }
+    }
+    includeEmptyDirs = false
+
+    inputs.dir(messageOverridesDir)
+
+    /*
+     * Keycloakify writes Keycloak's whole message bundle into the theme, which is what makes
+     * kcContext values like the user profile's "${email}" resolve before the page even loads.
+     * Appending rather than replacing keeps that bundle intact; java.util.Properties takes the
+     * last definition of a key, so these win.
+     */
+    doLast {
+        messageOverridesDir.listFiles({ f -> f.name.endsWith('.properties') } as FileFilter)
+                .each { overrideFile ->
+            def target = new File(unpackedThemeDir, "theme/openremote/login/messages/${overrideFile.name}")
+            if (!target.exists()) {
+                throw new GradleException(
+                        "No generated ${overrideFile.name} to append to; the build no longer " +
+                        "emits the message bundle these overrides assume.")
+            }
+            target << "\n# --- OpenRemote overrides ---\n" << overrideFile.text
+        }
+    }
+}
+
+sourceSets.main.resources.srcDir unpackedThemeDir
+
+processResources.dependsOn 'unpackLoginTheme'
+
 tasks.register('installDist', Copy) {
     into "${rootDir}/build/image"
     from jar.outputs
