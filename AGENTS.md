@@ -27,6 +27,7 @@ Work from the link you were given: node ids change when the file is reorganized,
 
 - Vaadin buttons do not take part in forms. Use `submitButton()` and `cancelButton()` from `src/layout.ts`; `cancelButton()` also sets `formnovalidate`, without which required fields block cancelling.
 - Check any form change with `new FormData(form)` in a real browser. A field that posts nothing looks identical on screen.
+- The page is hidden while branding loads and browsers refuse focus there, so `reveal()` in `src/branding.ts` refocuses `[autofocus]`. Check focus with `document.activeElement` after a real page load.
 - Scope label rules to `label:not([slot])`. Vaadin's own labels are slotted, and an unscoped rule overrides their color.
 
 ## Keycloakify
