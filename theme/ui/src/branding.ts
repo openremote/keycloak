@@ -24,6 +24,26 @@ function addStyle(css: string): void {
 }
 
 /**
+ * Points the tab's icon at `href`, reusing the one link element.
+ *
+ * Reused rather than appended because this is called twice - the theme's own icon before
+ * anything is known, then the realm's once the manager has answered - and two <link rel="icon">
+ * elements do not mean "use the second": browsers pick between them by their own rules, so
+ * appending would make which icon appears a coin toss.
+ *
+ * No `type` is set. It would have to be guessed for the manager's icon, which realms configure
+ * as .ico, .png or .svg alike, and a wrong type is worse than none: browsers use it to skip
+ * candidates they think they cannot decode.
+ */
+function setFavicon(href: string): void {
+  const link =
+    document.querySelector<HTMLLinkElement>('link[rel~="icon"]') ??
+    document.head.appendChild(Object.assign(document.createElement("link"), { rel: "icon" }));
+
+  link.href = href;
+}
+
+/**
  * Points the favicon at the copy shipped in the theme.
  *
  * It has to be absolute: the login page lives at URLs like
@@ -37,12 +57,8 @@ export function applyFavicon(kcContext: KcContext): void {
     return;
   }
 
-  const link = document.createElement("link");
-  link.rel = "icon";
-  link.type = "image/png";
   // rspack's output goes under the theme's resources/dist; public/ is copied in alongside.
-  link.href = `${resourcesPath}/dist/favicon.png`;
-  document.head.appendChild(link);
+  setFavicon(`${resourcesPath}/dist/favicon.png`);
 }
 
 function resolveAsset(path: string | undefined, base: string): string | null {
@@ -149,6 +165,7 @@ async function swapLogo(image: HTMLImageElement, src: string): Promise<void> {
 type Branding = {
   appTitle?: string;
   logo?: string;
+  favicon?: string;
   styles?: string;
 };
 
@@ -164,7 +181,7 @@ type Branding = {
  * are ignored rather than half-read. Changes to the branding itself are picked up by the
  * revalidation below, which compares and re-applies.
  */
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 
 function cacheKey(realm: string): string {
   return `or-branding:${CACHE_VERSION}:${realm}`;
@@ -201,6 +218,10 @@ async function apply(branding: Branding): Promise<void> {
     if (title) {
       title.textContent = branding.appTitle;
     }
+  }
+
+  if (branding.favicon) {
+    setFavicon(branding.favicon);
   }
 
   applyStyles(branding.styles);
@@ -254,6 +275,10 @@ async function fetchBranding(kcContext: KcContext): Promise<Branding | undefined
   return {
     appTitle: realmConfig.appTitle,
     logo: resolveAsset(realmConfig.logo, base) ?? undefined,
+    // Same treatment as the logo: realms configure it as a manager-relative path such as
+    // /images/favicon.ico, which has to resolve against the manager rather than against
+    // Keycloak - the two are different origins in every deployment that sets OR_MANAGER_URL.
+    favicon: resolveAsset(realmConfig.favicon, base) ?? undefined,
     styles: realmConfig.styles
   };
 }
