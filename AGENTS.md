@@ -44,8 +44,10 @@ Work from the link you were given: node ids change when the file is reorganized,
 
 ## Keycloak
 
+- The profile-driven pages (register, update-profile, identity-provider review) need Keycloak 26. `locale` arrives as a profile attribute; render it as a hidden input, as Keycloak does.
 - OTP errors are reported under the field `totp`, not `otp`.
 - `userOtpCredentials[].userLabel` may be blank; give the control a fallback name.
+- The identity-brokering pages carry `idpDisplayName`; show that rather than `idpAlias`.
 - Keycloak's QR code has a variable quiet zone, so do not hardcode it (see `.or-qr` in `login.css`).
 - `Unexpected error when authenticating with identity provider` is raised by the server, not the theme; see the identity providers section of `README.md`.
 
