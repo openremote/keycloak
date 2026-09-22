@@ -61,7 +61,12 @@ Work from the link you were given: node ids change when the file is reorganized,
 ## Gradle
 
 - The jar is assembled from two resource roots, so anything under `src/main/resources/theme/openremote/login` collides with the generated theme.
-- The Dockerfile's `ARG VERSION` is the Keycloak the image runs; the version catalog's `keycloak` is what the event listener compiles against.
+- The Dockerfile's `ARG VERSION` is the Keycloak the image runs; the version catalog's `keycloak` is what the event listener compiles against. `downloadStockKeycloak` reads the Dockerfile.
+
+## Dev server
+
+- `dev-server/StockRenderer.java` renders Keycloak's own templates from Keycloakify's mocks. `keycloakBehavior()` adapts the mock data to what `FreeMarkerLoginFormsProvider` provides; add a rule only for a template that fails to render, and never one that names a page.
+- The proxy to a live Keycloak answers 504 when nothing is running rather than failing the request.
 
 ## Verifying
 

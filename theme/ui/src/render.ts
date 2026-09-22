@@ -1,6 +1,5 @@
 import { render } from "lit";
 import type { KcContext } from "./login/KcContext";
-import { fallbackPage } from "./fallback";
 import { getI18n } from "./i18n";
 import { pages } from "./page-registry";
 
@@ -48,9 +47,19 @@ export function readThemeOverride(search: string): ThemeOverride {
 }
 
 export function renderPage(kcContext: KcContext, root: HTMLElement): void {
-  // Anything without a module in src/pages lands on the placeholder - see fallback.ts for
-  // why that matters when weighing Keycloakify up.
-  const page = pages.get(kcContext.pageId) ?? fallbackPage;
+  /*
+   * A page with no module in src/pages cannot reach this: the build keeps a template only for the
+   * pages found there (ui/scripts/write-implemented-pages.mjs reads the same directory this
+   * registry scans), so Keycloak serves everything else from its own theme and never loads this
+   * bundle for it. If the two ever disagree, say which page rather than rendering an empty card.
+   */
+  const page = pages.get(kcContext.pageId);
+
+  if (page === undefined) {
+    throw new Error(
+      `No implementation for ${kcContext.pageId}. The build should not have kept a template for it.`
+    );
+  }
 
   /*
    * i18n resolves synchronously in English so there is no blank first paint; for any other

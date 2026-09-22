@@ -146,7 +146,99 @@ sourceSets.main.resources.srcDir unpackedThemeDir
 
 processResources.dependsOn 'unpackLoginTheme'
 
+// ---------------------------------------------------------------------------
+// Stock Keycloak themes, for the dev server only
+//
+// ui/dev-server renders Keycloak's own login templates from the dev harness's mock data, so a
+// stock page can be shown beside ours - and an unimplemented page previewed - without running
+// Keycloak. This downloads those templates, and the FreeMarker that renders them, into
+// ui/.keycloak (gitignored). Nothing here reaches the jar.
+// ---------------------------------------------------------------------------
+
+repositories {
+    mavenCentral()
+}
+
+/*
+ * The Keycloak the image actually runs - the Dockerfile's ARG VERSION - because the pages to
+ * compare against are the ones that version serves. The version catalog's keycloak entry is the
+ * SPI this repo compiles against, and is not necessarily the same.
+ */
+def keycloakImageVersion = providers.fileContents(rootProject.layout.projectDirectory.file('Dockerfile'))
+        .asText
+        .map { dockerfile ->
+            def match = dockerfile =~ /(?m)^ARG VERSION=(\S+)\s*$/
+            if (!match.find()) {
+                throw new GradleException('No `ARG VERSION=` line in the Dockerfile')
+            }
+            match.group(1)
+        }
+        .get()
+
+configurations {
+    stockKeycloakThemes { canBeConsumed = false; transitive = false }
+    stockKeycloakVendor { canBeConsumed = false; transitive = false }
+    stockRenderer { canBeConsumed = false }
+}
+
+dependencies {
+    stockKeycloakThemes "org.keycloak:keycloak-themes:${keycloakImageVersion}"
+    // PatternFly and the other assets the themes import live in a jar of their own.
+    stockKeycloakVendor "org.keycloak:keycloak-themes-vendor:${keycloakImageVersion}"
+    // Keycloak's parent pom pins the FreeMarker it renders with, so this follows it on upgrade.
+    stockRenderer platform("org.keycloak:keycloak-parent:${keycloakImageVersion}")
+    stockRenderer 'org.freemarker:freemarker'
+    // Only to read the dev server's own protocol, so it follows this repo rather than Keycloak.
+    stockRenderer libs.jacksonDatabind
+}
+
+def stockKeycloakManifest = layout.buildDirectory.file('stock-keycloak/stock.json')
+
+tasks.register('writeStockKeycloakManifest') {
+    description = 'Records which Keycloak the downloaded stock themes belong to'
+    group = 'build'
+
+    def version = keycloakImageVersion
+    def manifest = stockKeycloakManifest
+
+    inputs.property('keycloakVersion', version)
+    outputs.file(manifest)
+
+    doLast {
+        manifest.get().asFile.text = groovy.json.JsonOutput.prettyPrint(
+                groovy.json.JsonOutput.toJson([keycloakVersion: version]))
+    }
+}
+
+tasks.register('downloadStockKeycloak', Sync) {
+    description = "Downloads Keycloak's own login themes for the dev server's stock pages"
+    group = 'build'
+
+    into file('ui/.keycloak')
+
+    // The two themes worth rendering - keycloak.v2, what a fresh realm uses, and keycloak, what
+    // the built theme's parent= points at for the pages this theme does not implement - plus
+    // base, which both extend.
+    from(zipTree(configurations.stockKeycloakThemes.elements.map { it.first().asFile })) {
+        include 'theme/base/login/**', 'theme/keycloak/login/**', 'theme/keycloak.v2/login/**', 'theme/keycloak/common/**'
+    }
+    from(zipTree(configurations.stockKeycloakVendor.elements.map { it.first().asFile })) {
+        include 'theme/keycloak/common/**'
+    }
+    // The renderer's classpath, as a directory: it is passed to java as `lib/*`, so which jars are
+    // in it is the resolved graph's business and nothing here has to name them.
+    from(configurations.stockRenderer) {
+        into 'lib'
+    }
+    from(tasks.named('writeStockKeycloakManifest'))
+
+    includeEmptyDirs = false
+}
+
 tasks.register('installDist', Copy) {
+    // Not part of the image: only so the dev server's stock pages work after the usual build.
+    dependsOn 'downloadStockKeycloak'
+
     into "${rootDir}/build/image"
     from jar.outputs
 }

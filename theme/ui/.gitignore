@@ -2,6 +2,8 @@ node_modules/
 dist/
 build_keycloak/
 src/kc.gen.tsx
+# Keycloak's own themes and the renderer's jars, downloaded by `./gradlew installDist`.
+.keycloak/
 
 # Yarn, matching the openremote monorepo's .gitignore.
 # .yarn/install-state.gz is a machine-local resolution cache that Yarn rewrites on install

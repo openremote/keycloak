@@ -1,6 +1,7 @@
 import { CopyRspackPlugin, HtmlRspackPlugin } from "@rspack/core";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stockKeycloak } from "./dev-server/stock.mjs";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === "development";
@@ -78,6 +79,44 @@ export default {
     },
     // Templates and styles are reached through the import graph, but list them explicitly so
     // a file that is only referenced (not imported) still triggers a rebuild.
-    watchFiles: ["src/**/*", "index.html"]
+    watchFiles: ["src/**/*", "index.html"],
+    /*
+     * Stock Keycloak pages rendered right here, from Keycloak's own templates and this page's mock
+     * data - the default for the compare pane, and what an unimplemented page shows. No Keycloak
+     * and no container; it needs `./gradlew installDist` to have downloaded the themes, and a JDK.
+     * See dev-server/stock.mjs.
+     */
+    setupMiddlewares: (middlewares, devServer) => {
+      stockKeycloak({ uiDir: dirname }).install(devServer.app);
+      return middlewares;
+    },
+    /*
+     * The compare pane's optional live mode (?compare=live): a real Keycloak, rendering its own
+     * templates, beside ours - for what only a running server does, like real flows and validation.
+     *
+     * Proxied rather than framed directly because Keycloak sends
+     * X-Frame-Options: SAMEORIGIN on login pages, which blocks a cross-origin iframe outright.
+     * Served under this origin, the framed document is same-origin and the header passes.
+     *
+     * changeOrigin stays false on purpose. Keycloak in start-dev derives its own base URL from
+     * the Host header, so forwarding this server's Host makes it emit links, form actions and
+     * redirects that point back through the proxy - which is what lets the whole flow be
+     * driven inside the pane rather than just the first page being viewed. A Keycloak with
+     * KC_HOSTNAME set ignores the Host header and cannot be compared against; compare.ts says
+     * so rather than letting the pane fail silently.
+     *
+     * /realms is the flow and /resources is the theme's CSS and JS. /auth covers both again for
+     * a Keycloak served under a relative path, which OpenRemote's own image is - compare.ts
+     * probes for it rather than being told.
+     *
+     * Nothing here is reachable in a production build; devServer applies only to `rspack serve`.
+     */
+    proxy: [
+      {
+        context: ["/realms", "/resources", "/auth"],
+        target: process.env.KC_COMPARE_URL ?? "http://localhost:8082",
+        changeOrigin: false
+      }
+    ]
   }
 };
