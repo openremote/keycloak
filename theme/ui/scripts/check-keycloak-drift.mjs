@@ -32,6 +32,14 @@ const DOWNLOAD_TIMEOUT_MS = 60_000;
  */
 const SCRIPT = relative(REPO_ROOT, fileURLToPath(import.meta.url)).replaceAll("\\", "/");
 
+/*
+ * What `./gradlew installDist` unpacks for the dev server's stock pages. Reused when it is
+ * there and current, so a developer who has built once does not download the same jar twice.
+ * It is written by a Sync task, which deletes anything it did not put there, so the cache
+ * above stays outside it.
+ */
+const GRADLE_THEMES_DIR = join(UI_DIR, ".keycloak");
+
 /* The theme unimplemented pages fall through to, and base, which every theme is built on. */
 const THEMES = ["base", parentTheme()];
 
@@ -114,6 +122,20 @@ function versionBranchedFrom(version) {
 
 /** The directory holding `theme/<name>/login/...`, downloading Keycloak's themes if needed. */
 async function themesRoot(version) {
+  const manifest = join(GRADLE_THEMES_DIR, "stock.json");
+
+  if (existsSync(manifest)) {
+    const unpacked = JSON.parse(readFileSync(manifest, "utf8"));
+
+    // Gradle unpacks only the themes the dev server renders, which a parent theme may not be.
+    if (
+      unpacked.keycloakVersion === version &&
+      THEMES.every(theme => existsSync(loginDir(GRADLE_THEMES_DIR, theme)))
+    ) {
+      return GRADLE_THEMES_DIR;
+    }
+  }
+
   const extracted = join(CACHE_DIR, version);
 
   if (existsSync(messagesFile(extracted))) {
