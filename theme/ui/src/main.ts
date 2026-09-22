@@ -7,7 +7,7 @@
  */
 import "./styles/index.css";
 import type { KcContext } from "./login/KcContext";
-import { applyBranding, applyFavicon } from "./branding";
+import { applyBranding, applyFavicon, armReveal } from "./branding";
 import { applyTheme, renderPage } from "./render";
 
 declare global {
@@ -45,6 +45,10 @@ async function main(): Promise<void> {
   }
 
   applyFavicon(kcContext);
+
+  // Before rendering, so a page that throws still gets revealed rather than staying hidden.
+  armReveal();
+
   renderPage(kcContext, root);
 
   void applyBranding(kcContext);

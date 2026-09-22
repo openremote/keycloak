@@ -20,6 +20,16 @@
         if (override === "dark" || (override !== "light" && prefersDark)) {
           document.documentElement.setAttribute("theme", "dark");
         }
+
+        // Per-realm branding (logo, app title, brand color) is fetched at runtime, so keep
+        // the page hidden until it lands. Otherwise stock OpenRemote branding paints first.
+        // applyBranding takes the class off again, and main.ts arms a timeout before it
+        // renders, so this can never be permanent.
+        //
+        // Added from script rather than written into <html> above, because only a script can
+        // take it off again: with JavaScript off the class is never added in the first place,
+        // and the visitor gets the unbranded page instead of a blank one.
+        document.documentElement.classList.add("or-booting");
       })();
     </script>
   </head>
