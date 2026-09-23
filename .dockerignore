@@ -1,0 +1,8 @@
+# The Dockerfile takes exactly two files from the build context: the jars Gradle writes to
+# build/image. Without this, Docker uploads the whole repository to the daemon before reading the
+# Dockerfile - theme/ui/node_modules alone is hundreds of megabytes - and CI builds twice per run.
+#
+# An allow-list rather than a deny-list, so a new directory cannot quietly bloat the context again.
+# If the Dockerfile ever COPYs something else, add it here too; the build fails loudly without it.
+*
+!build/image/*.jar
