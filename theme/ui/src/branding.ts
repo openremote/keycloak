@@ -61,6 +61,39 @@ export function applyFavicon(kcContext: KcContext): void {
   setFavicon(`${resourcesPath}/dist/favicon.png`);
 }
 
+/**
+ * Stylesheets a custom project's own theme asked for.
+ *
+ * A custom project extends this theme with a directory of its own under the themes volume and
+ * `parent=openremote`. In a FreeMarker theme, `styles=` in its theme.properties becomes a
+ * `<link>` per file; these pages are a compiled bundle, so nothing turns that property into
+ * anything, and a child theme's CSS is silently never loaded.
+ *
+ * `orStyles` rather than Keycloak's own `styles`: that one is inherited from the fallback theme
+ * (see `parent=` in theme/build.gradle) and is what the pages this theme does not implement are
+ * rendered with. Reading it would put the fallback theme's stylesheet on our pages, and
+ * declaring our own would take it away from theirs.
+ *
+ * Appended to <head>, so after the bundle's own stylesheet and winning where specificity ties.
+ * Paths are relative to the theme's resources, as Keycloak's `styles=` are.
+ */
+export function applyThemeStyles(kcContext: KcContext): void {
+  const declared = kcContext.properties?.orStyles?.trim();
+  const resourcesPath = kcContext.url?.resourcesPath;
+
+  if (!declared || !resourcesPath) {
+    return;
+  }
+
+  for (const path of declared.split(/\s+/)) {
+    const link = document.createElement("link");
+
+    link.rel = "stylesheet";
+    link.href = /^(?:https?:)?\/\//.test(path) ? path : `${resourcesPath}/${path}`;
+    document.head.appendChild(link);
+  }
+}
+
 function resolveAsset(path: string | undefined, base: string): string | null {
   if (!path) {
     return null;
