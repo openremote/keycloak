@@ -210,6 +210,22 @@ docker run ... -e OR_MANAGER_URL=http://127.0.0.1:8080 openremote/keycloak:devel
 
 It is read at render time from the theme's `theme.properties`, so it takes effect on restart with no rebuild. Such a setup also needs the Keycloak origin added to `OR_WEBSERVER_ALLOWED_ORIGINS` on the manager, since production CORS is not `*` (in dev mode the manager already allows all origins).
 
+### Custom stylesheets
+
+Branding that a realm sets in `manager_config.json` needs no theme at all. A custom project that wants to go further extends this one with a theme of its own, mounted under `/deployment/keycloak/themes` and selected per realm:
+
+```properties
+# deployment/keycloak/themes/acme/login/theme.properties
+parent=openremote
+orStyles=css/custom.css
+```
+
+The stylesheets in `orStyles` are loaded after the theme's own, so they win where specificity ties, and paths resolve against that theme's `resources` directory exactly as Keycloak's `styles=` does. With `--spi-theme-cache-themes=false --spi-theme-static-max-age=-1` on the container, editing the file is a browser refresh.
+
+`orStyles` rather than Keycloak's own `styles=`, because that property is inherited from the fallback theme and is what the pages this theme does not implement are rendered with: reading it would put the fallback theme's stylesheet on these pages, and declaring our own would take it away from theirs.
+
+Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. It cannot override messages: every string in these pages comes from the compiled bundle.
+
 ### Translations
 
 Pages address Keycloak's own message keys, and Keycloakify ships Keycloak's bundle for ~30 languages, so enabling internationalization on a realm translates the theme.
