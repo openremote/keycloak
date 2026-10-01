@@ -71,7 +71,53 @@ Each page narrows `kcContext` to its own variant, so a typo in a `kcContext` fie
 
 Strings come from `i18n.msgStr(key)` using Keycloak's own message keys; OpenRemote's departures from Keycloak's wording are in `src/i18n.ts`. Use `advancedMsgStr` when the key itself comes from `kcContext` — authenticator app names, user profile labels, admin-authored messages.
 
+**To find the key for a control, read Keycloak's own template for that page** and copy the key it passes to `msg(...)`; that is the rule the whole theme follows, so the wording stays Keycloak's in every language. `yarn check-keycloak` leaves those templates in `.keycloak-cache/<version>/theme/base/login/`. A key that does not exist is a compile error, because `msgStr` only accepts Keycloak's own keys.
+
 Everything dev-only lives in `src/dev/`, reached solely through a dynamic import inside an `if (process.env.NODE_ENV === "development")` branch in `src/main.ts`. That placement is load-bearing: with the import hoisted into a module-level helper merely *called* from the branch, rspack can no longer eliminate it and the page switcher ships to production. Worth re-checking after changes — the production build should emit a single chunk containing neither the nav nor the mocks.
+
+## Keeping up with Keycloak
+
+Most of what this theme depends on lives in Keycloak rather than here: the message key behind every control, the fields a page is handed, which pages exist at all. None of that is checked by compiling, so an upgrade can rename a key or drop a page and everything still builds.
+
+`yarn check-keycloak` is the check that notices, and it is run by `.github/workflows/keycloak-drift.yml` on pushes to `main` and on every pull request that touches `src/`, the `Dockerfile`, the script or the workflow. It keeps no record of its own: a Keycloak version's templates never change, so the published jar for each version is the record, and the `Dockerfile` and git history say which versions those are.
+
+**Four things it fails on**, each true or false against the version `ARG VERSION` pins:
+
+| Checked | Means |
+| --- | --- |
+| Every page in `src/pages` still exists upstream | A page we replaced is gone, so ours renders where Keycloak has nothing |
+| Every message key the theme names is defined by Keycloak | The key was dropped or renamed. It still type-checks, because the types come from Keycloakify's copy, but the server resolves nothing |
+| No stand-in in `src/i18n.ts` is redundant | Keycloakify now ships a key we were carrying ourselves, so ours can go and every locale gets Keycloak's own translation |
+| No key the script records as never defined upstream is defined now | Keycloak added a message for something we were standing in for, so the exception can go |
+
+**Five things it reports**, when the branch moves the pinned version: the templates behind our pages that changed, with a diff command each; pages added or removed upstream; new macros that a template behind one of our pages imports; message keys Keycloak's own version of our pages has started naming that our theme does not, which is how a relabelled control shows up while the key we still name goes on resolving; and keys we name whose English text changed, since the same key can carry different wording or a parameter it did not have.
+
+One of the five fails, under **Failure: Drift detected**: a key Keycloak's own version of one of our pages has started naming that our theme does not. That is a control it relabelled, and our page is the thing to change, so it uses Keycloak's key for it. Where ours is deliberately worded otherwise, the key goes in `UPSTREAM_ONLY` in the check, with the reason in a comment beside it.
+
+The rest is listed under **Consider checking** and does not fail: there is nothing here to edit to settle whether a template that moved, or wording Keycloak rewrote, matters to our version of a page, so a failure would be a red that no change can clear. Each line is a warning annotation on the run, and the report heads with Keycloak's release notes and upgrading guide for the new version.
+
+Three further failures are about the check rather than the theme. It reads upstream markup with regexes, and one that stops matching makes an upgrade look clean, so each has to prove it still finds something in Keycloak's own versions of our pages.
+
+What it watches is our pages' upstream counterparts closed over `<#import>`, not just the page files: 26.8.0 redesigned the identity provider buttons inside `social-providers.ftl` and left `login.ftl` untouched, which the page files alone would have reported as no change at all.
+
+It needs `unzip` or a JDK, and downloads Keycloak's themes jar once per version into `.keycloak-cache/`.
+
+### What it does not cover
+
+The Vaadin components and the design system have their own versions and their own release notes; nothing here notices a Lumo token or a slot contract changing, which is the most likely way a page breaks silently. Neither does it look at Keycloakify, whose generated templates and `kcContext` types only move when its version in `package.json` does, where `tsc` is the net. And it reads templates, not behavior: a page Keycloak changes without touching its template, by sending a field it did not send before, still has to be found by rendering it.
+
+### When it fails
+
+- **`Keycloak <version> has no <page>.ftl`** — our page has no counterpart any more, so it is dead weight in the jar. Remove it, or repoint it at whatever replaced it.
+- **`Message key "x" is not defined by Keycloak <version>`** — find the control in Keycloak's own template for that page and use the key it uses now. If the key never existed upstream and naming it is still right, as with `languages`, which Keycloak's own `template.ftl` names too, add it to `UNDEFINED_UPSTREAM` in the check with the reason.
+- **`i18n.ts carries "x" only because ...`** — delete that entry from `withCustomTranslations`.
+- **`### Failure: Drift detected`** in the upgrade report: Keycloak relabelled a control we also have. Use its key on our page, or add the key to `UPSTREAM_ONLY` with the reason beside it.
+- **`UPSTREAM_ONLY lists "x" ...`**: that entry has outlived itself, because Keycloak does not name the key behind any page we implement, or because this theme names it now. Drop it, or check the spelling.
+- **`No <#import> resolves ...`**, **`No page of Keycloak's renders registrationLayout ...`** or **`No msg("...") resolves ...`**: the check's own reading of Keycloak's templates has stopped working, so the upgrade report would be quietly incomplete. Fix the named function; do not silence the check.
+
+### When you bump Keycloak
+
+Change `ARG VERSION` in the `Dockerfile` and run `yarn check-keycloak`. The four checks above run against the new version, and the report is the review list for the upgrade: a control Keycloak relabelled fails it, the rest is for reading. Nothing else in the repo needs the version: the build and this check both read it from there.
 
 ## Building it standalone
 
