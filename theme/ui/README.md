@@ -71,7 +71,41 @@ Each page narrows `kcContext` to its own variant, so a typo in a `kcContext` fie
 
 Strings come from `i18n.msgStr(key)` using Keycloak's own message keys; OpenRemote's departures from Keycloak's wording are in `src/i18n.ts`. Use `advancedMsgStr` when the key itself comes from `kcContext` — authenticator app names, user profile labels, admin-authored messages.
 
+**To find the key for a control, read Keycloak's own template for that page** and copy the key it passes to `msg(...)`; that is the rule the whole theme follows, so the wording stays Keycloak's in every language. `yarn check-keycloak` leaves those templates in `.keycloak-cache/<version>/theme/base/login/`. A key that does not exist is a compile error, because `msgStr` only accepts Keycloak's own keys.
+
 Everything dev-only lives in `src/dev/`, reached solely through a dynamic import inside an `if (process.env.NODE_ENV === "development")` branch in `src/main.ts`. That placement is load-bearing: with the import hoisted into a module-level helper merely *called* from the branch, rspack can no longer eliminate it and the page switcher ships to production. Worth re-checking after changes — the production build should emit a single chunk containing neither the nav nor the mocks.
+
+## Keeping up with Keycloak
+
+Most of what this theme depends on lives in Keycloak rather than here: the message key behind every control, the fields a page is handed, which pages exist at all. None of that is checked by compiling, so an upgrade can rename a key or drop a page and everything still builds.
+
+`yarn check-keycloak` is the check that notices, and it is run by `.github/workflows/keycloak-drift.yml` on every pull request that touches `src/` or the pinned version. It keeps no record of its own: a Keycloak version's templates never change, so the published jar for each version is the record, and the `Dockerfile` and git history say which versions those are.
+
+**Three things it fails on**, each true or false against the version `ARG VERSION` pins:
+
+| Checked | Means |
+| --- | --- |
+| Every page in `src/pages` still exists upstream | A page we replaced is gone, so ours renders where Keycloak has nothing |
+| Every message key the theme names is defined by Keycloak | The key was dropped or renamed. It still type-checks, because the types come from Keycloakify's copy, but the server resolves nothing |
+| No stand-in in `src/i18n.ts` is redundant | Keycloakify now ships a key we were carrying ourselves, so ours can go and every locale gets Keycloak's own translation |
+
+**One thing it reports**, when the branch moves the pinned version: which of Keycloak's own versions of the pages we implement changed between the two, plus any login template added or removed. Whether a change matters to our version of a page is a judgment, so it prints a diff command per template and lands in the job summary rather than failing the build.
+
+It needs `unzip` or a JDK, and downloads Keycloak's themes jar once per version into `.keycloak-cache/`.
+
+### What it does not cover
+
+The Vaadin components and the design system have their own versions and their own release notes; nothing here notices a Lumo token or a slot contract changing, which is the most likely way a page breaks silently. Neither does it look at Keycloakify, whose generated templates and `kcContext` types only move when its version in `package.json` does, where `tsc` is the net. And it reads templates, not behavior: a page Keycloak changes without touching its template, by sending a field it did not send before, still has to be found by rendering it.
+
+### When it fails
+
+- **`Keycloak <version> has no <page>.ftl`** — our page has no counterpart any more, so it is dead weight in the jar. Remove it, or repoint it at whatever replaced it.
+- **`Message key "x" is not defined by Keycloak <version>`** — find the control in Keycloak's own template for that page and use the key it uses now. If the key never existed upstream and naming it is still right, as with `languages`, which Keycloak's own `template.ftl` names too, add it to `UNDEFINED_UPSTREAM` in the check with the reason.
+- **`i18n.ts carries "x" only because ...`** — delete that entry from `withCustomTranslations`.
+
+### When you bump Keycloak
+
+Change `ARG VERSION` in the `Dockerfile` and run `yarn check-keycloak`. The three checks above run against the new version, and the report lists every template behind our pages that moved between the old version and the new one, which is the review list for the upgrade. Nothing else in the repo needs the version: the build and this check both read it from there.
 
 ## Building it standalone
 

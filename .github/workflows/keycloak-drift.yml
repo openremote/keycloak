@@ -1,0 +1,60 @@
+# Checks this theme against the Keycloak it is written for, which nothing else in CI does.
+#
+# The build only proves the theme compiles and packages. It cannot say whether the pages this
+# theme replaces still exist upstream, or whether the message keys it names are still defined,
+# so this does, against the version the Dockerfile pins. On a branch that moves that version it
+# also reports which of Keycloak's own versions of our pages changed, into the job summary.
+#
+# Separate from the CI/CD workflow on purpose: this is the one job that reaches Maven Central,
+# and a release build must not fail because that was unreachable.
+name: Keycloak check
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - 'theme/ui/src/**'
+      - 'theme/ui/scripts/check-keycloak-drift.mjs'
+      - '.github/workflows/keycloak-drift.yml'
+
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'theme/ui/src/**'
+      - 'theme/ui/scripts/check-keycloak-drift.mjs'
+      - '.github/workflows/keycloak-drift.yml'
+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Keycloak check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The upgrade report compares against the version on the branch this one came from.
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: '22'
+
+      # Only for keycloakify's bundled message set, which the check reads to decide whether the
+      # stand-ins in src/i18n.ts are still needed.
+      - name: Install dependencies
+        working-directory: theme/ui
+        run: node .yarn/releases/yarn-4.17.1.cjs install --immutable
+
+      - name: Check against Keycloak
+        working-directory: theme/ui
+        run: node scripts/check-keycloak-drift.mjs
