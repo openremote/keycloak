@@ -1,6 +1,7 @@
 import { CopyRspackPlugin, HtmlRspackPlugin } from "@rspack/core";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { stockKeycloak } from "./dev-server/stock.mjs";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === "development";
@@ -78,6 +79,16 @@ export default {
     },
     // Templates and styles are reached through the import graph, but list them explicitly so
     // a file that is only referenced (not imported) still triggers a rebuild.
-    watchFiles: ["src/**/*", "index.html"]
+    watchFiles: ["src/**/*", "index.html"],
+    /*
+     * Stock Keycloak pages rendered right here, from Keycloak's own templates and this page's mock
+     * data: the default for the compare pane, and what an unimplemented page shows. No Keycloak
+     * and no container; it needs `./gradlew installDist` to have downloaded the themes, and a JDK.
+     * See dev-server/stock.mjs.
+     */
+    setupMiddlewares: (middlewares, devServer) => {
+      stockKeycloak({ uiDir: dirname }).install(devServer.app);
+      return middlewares;
+    }
   }
 };
