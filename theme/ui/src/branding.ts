@@ -14,6 +14,17 @@ import type { KcContext } from "./login/KcContext";
  */
 const BRAND_SELECTOR = ':root, :root[theme~="dark"]';
 
+/*
+ * The <style> elements branding has put in the document, so that the next application can
+ * take them out again.
+ *
+ * Branding is applied more than once per page: from the cache first, then again when the
+ * manager's answer turns out to differ. A custom property cannot be un-set by adding more
+ * CSS, so an override the configuration no longer carries is only gone once the element that
+ * declared it is.
+ */
+let brandStyles: HTMLStyleElement[] = [];
+
 function addStyle(css: string): void {
   if (!css) {
     return;
@@ -21,6 +32,15 @@ function addStyle(css: string): void {
   const style = document.createElement("style");
   style.textContent = css;
   document.head.appendChild(style);
+  brandStyles.push(style);
+}
+
+function clearStyles(): void {
+  for (const style of brandStyles) {
+    style.remove();
+  }
+
+  brandStyles = [];
 }
 
 /**
@@ -79,6 +99,9 @@ function resolveAsset(path: string | undefined, base: string): string | null {
  * legacy accent, then inject the original so any explicit --or-color-* still wins.
  */
 function applyStyles(styles: string | undefined): void {
+  // Replaces rather than adds: see brandStyles.
+  clearStyles();
+
   if (!styles) {
     return;
   }
@@ -218,27 +241,61 @@ function writeCache(realm: string, branding: Branding | undefined): void {
   }
 }
 
-/** Applies resolved branding to the page. Everything here is idempotent. */
-async function apply(branding: Branding): Promise<void> {
-  if (branding.appTitle) {
-    document.title = branding.appTitle;
-    const title = document.getElementById("or-app-title");
+/** The page as the theme itself renders it, before any branding has been applied. */
+type Stock = {
+  title: string;
+  appTitle: string;
+  logo: string;
+  favicon: string;
+};
 
-    if (title) {
-      title.textContent = branding.appTitle;
-    }
+/**
+ * Captured on the first apply() and reused when the manager's answer differs from the cache,
+ * by which time the DOM holds that cached branding rather than this.
+ */
+let stock: Stock | undefined;
+
+/**
+ * Applies resolved branding to the page.
+ *
+ * Idempotent, and complete: every property the branding does not carry is put back to what
+ * the theme ships, so this is also how branding is withdrawn.
+ */
+async function apply(branding: Branding): Promise<void> {
+  stock ??= {
+    title: document.title,
+    appTitle: document.getElementById("or-app-title")?.textContent ?? "",
+    logo: (document.getElementById("or-logo") as HTMLImageElement | null)?.src ?? "",
+    favicon: document.querySelector<HTMLLinkElement>('link[rel~="icon"]')?.href ?? ""
+  };
+
+  document.title = branding.appTitle || stock.title;
+
+  const title = document.getElementById("or-app-title");
+
+  if (title) {
+    // Not the document title: the layout starts from the realm's display name.
+    title.textContent = branding.appTitle || stock.appTitle;
   }
 
-  if (branding.favicon) {
-    setFavicon(branding.favicon);
+  const favicon = branding.favicon || stock.favicon;
+
+  if (favicon) {
+    setFavicon(favicon);
+  } else {
+    // Nothing to point at: the theme's own icon is missing too, so take the element out
+    // rather than leave it on a withdrawn brand's icon.
+    document.querySelector('link[rel~="icon"]')?.remove();
   }
 
   applyStyles(branding.styles);
 
   const logoEl = document.getElementById("or-logo") as HTMLImageElement | null;
+  const logo = branding.logo || stock.logo;
 
-  if (branding.logo && logoEl) {
-    await swapLogo(logoEl, branding.logo);
+  // Both are absolute, so this compares: assigning the same src again re-decodes the image.
+  if (logoEl && logo && logoEl.src !== logo) {
+    await swapLogo(logoEl, logo);
   }
 }
 
@@ -266,12 +323,18 @@ async function fetchBranding(kcContext: KcContext): Promise<Branding | undefined
     { credentials: "omit" }
   );
 
+  /*
+   * Throws because the manager and keycloak theme branding are no longer the same. An
+   * empty reponse withdraws what is on screen and clears the cache, while the manager
+   * failing to answer has to leave both alone.
+   */
   if (!response.ok) {
-    return undefined;
+    throw new Error(`manager configuration: HTTP ${response.status}`);
   }
 
   const config = await response.json();
-  const realmConfig = config.realms?.[realm] ?? config.realms?.default;
+  const realms = config.realms ?? {};
+  const realmConfig = realms[realm] ? { ...realms.default, ...realms[realm] } : realms.default;
 
   if (!realmConfig) {
     return undefined;
@@ -318,9 +381,13 @@ export async function applyBranding(kcContext: KcContext): Promise<void> {
      * Only re-apply when something actually changed, so the common case does no DOM work and
      * cannot flicker. When it has changed, this page shows the old branding briefly and then
      * updates; every later load is correct from the first paint.
+     *
+     * An answer with no branding in it counts as a change, and is applied: a realm that has
+     * dropped a property, or its whole entry, goes back to the theme's own. Only the manager
+     * not answering at all leaves the page as it is, through the catch below.
      */
-    if (fresh && JSON.stringify(fresh) !== JSON.stringify(cached)) {
-      await apply(fresh);
+    if (JSON.stringify(fresh ?? {}) !== JSON.stringify(cached ?? {})) {
+      await apply(fresh ?? {});
     }
   } catch {
     // No manager reachable: keep whatever is on screen, cached or stock.
