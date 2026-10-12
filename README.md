@@ -82,10 +82,14 @@ Build the jar and mount it into a stock Keycloak — no need to build this repo'
 
 ```shell
 ./gradlew :theme:jar
+
+# The Keycloak this image is built on, read from the Dockerfile so the two cannot drift
+KC_VERSION=$(sed -n 's/^ARG VERSION=//p' Dockerfile)
+
 docker run --rm -p 8081:8080 \
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
   -v "$PWD/theme/build/libs/openremote-theme-provider.jar:/opt/keycloak/providers/or-theme.jar:ro" \
-  keycloak/keycloak:26.7.3 start-dev --spi-theme-cache-themes=false --spi-theme-static-max-age=-1
+  "keycloak/keycloak:$KC_VERSION" start-dev --spi-theme-cache-themes=false --spi-theme-static-max-age=-1
 ```
 
 Then set the realm's **login theme** to `openremote` (Realm settings → Themes). Set only the login theme: `--spi-theme-default=openremote` makes Keycloak look for an *admin* theme of that name too, which this theme does not provide, and the admin console then fails to load.
@@ -111,8 +115,9 @@ and make the port in `issuer` the port you browse to. When it does go wrong the 
 To read Keycloak's own templates and message bundle for reference — which is the fastest way to answer "what does Keycloak do here?" — take them from Maven rather than from a container:
 
 ```shell
-curl -O https://repo1.maven.org/maven2/org/keycloak/keycloak-themes/26.7.3/keycloak-themes-26.7.3.jar
-unzip -q keycloak-themes-26.7.3.jar 'theme/base/login/*' 'theme/keycloak.v2/login/*'
+KC_VERSION=$(sed -n 's/^ARG VERSION=//p' Dockerfile)
+curl -O "https://repo1.maven.org/maven2/org/keycloak/keycloak-themes/$KC_VERSION/keycloak-themes-$KC_VERSION.jar"
+unzip -q "keycloak-themes-$KC_VERSION.jar" 'theme/base/login/*' 'theme/keycloak.v2/login/*'
 ```
 
 From a running container it is `docker cp ID:/opt/keycloak/lib/lib/main/org.keycloak.keycloak-themes-${VERSION}.jar ./`, which has the advantage of being unambiguously the version you are running.
