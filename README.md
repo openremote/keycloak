@@ -53,7 +53,7 @@ docker buildx build --builder or-builder --load -t openremote/keycloak:dev .
 
 Use the `docker-container` builder rather than a plain `docker build`: with the default builder the same Dockerfile comes out around 200 MB larger, because that builder stores a copy of Keycloak's whole library directory that this one recognizes as unchanged. CI uses the same kind of builder (`docker/setup-buildx-action`).
 
-Gradle drives the whole thing, so this needs **Node 20+** on the PATH as well as a JDK. It also needs **Apache Maven**: Keycloakify shells out to it and refuses to start without it, even though the jar it produces that way is discarded in favor of Gradle's.
+Gradle drives the whole thing, so this needs **Node 20+** and **JDK 21** on the PATH, the pair CI builds with. It also needs **Apache Maven**: Keycloakify shells out to it and refuses to start without it, even though the jar it produces that way is discarded in favor of Gradle's.
 
 Upgrading the design system is a version bump in `theme/ui/package.json` — there is no vendoring step and nothing to keep in sync.
 
