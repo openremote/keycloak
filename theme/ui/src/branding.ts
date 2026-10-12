@@ -329,7 +329,7 @@ async function fetchBranding(kcContext: KcContext): Promise<Branding | undefined
    * failing to answer has to leave both alone.
    */
   if (!response.ok) {
-    throw new Error(`manager configuration: HTTP ${response.status}`);
+    throw new Error(`HTTP ${response.status} from ${response.url}`);
   }
 
   const config = await response.json();
@@ -389,8 +389,13 @@ export async function applyBranding(kcContext: KcContext): Promise<void> {
     if (JSON.stringify(fresh ?? {}) !== JSON.stringify(cached ?? {})) {
       await apply(fresh ?? {});
     }
-  } catch {
+  } catch (error) {
     // No manager reachable: keep whatever is on screen, cached or stock.
+    console.warn(
+      "Branding not applied: no manager configuration available. Set OR_MANAGER_URL on the " +
+      "Keycloak container when the manager is not on the origin that serves the login page.",
+      error
+    );
   } finally {
     reveal();
   }
