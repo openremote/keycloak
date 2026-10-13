@@ -133,8 +133,10 @@ function applyStyles(styles: string | undefined): void {
  * Idempotent, and called from three places on purpose: as soon as branding has been applied,
  * on any failure path, and from a timeout: a manager that is slow or unreachable must cost
  * the user a short delay, never a blank page.
+ *
+ * Exported for the dev harness, which has no manager to ask and so nothing to apply.
  */
-function reveal(): void {
+export function reveal(): void {
   const { classList } = document.documentElement;
 
   if (!classList.contains("or-booting")) {

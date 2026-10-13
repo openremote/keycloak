@@ -7,7 +7,7 @@
  */
 import { createGetKcContextMock } from "keycloakify/login/KcContext/getKcContextMock";
 import type { KcContext } from "../login/KcContext";
-import { applyBranding } from "../branding";
+import { reveal } from "../branding";
 import { applyTheme, readThemeOverride, renderPage } from "../render";
 import { mountPageNav } from "./page-nav";
 
@@ -126,7 +126,11 @@ export function runDevMode(root: HTMLElement): void {
     }
 
     renderPage(kcContext, root);
-    void applyBranding(kcContext);
+    /*
+     * No manager here, and nothing in the harness can point one at the dev server, so there is
+     * nothing to fetch. The page still has to be shown, which applyBranding did on the way out.
+     */
+    reveal();
 
     nav.setCurrent(pageId);
   };
