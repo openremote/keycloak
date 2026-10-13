@@ -7,6 +7,7 @@ const isDev = process.env.NODE_ENV === "development";
 
 export default {
   mode: isDev ? "development" : "production",
+  devtool: isDev ? "source-map" : false,
   entry: "./src/main.ts",
   output: {
     path: path.resolve(dirname, "dist"),
