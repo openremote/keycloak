@@ -98,20 +98,6 @@ There is no bind-mount hot reload for the login pages any more, because they are
 
 Pages that are awkward to reach by driving a flow can be deep-linked with [application-initiated actions](https://www.keycloak.org/docs/latest/server_admin/#con-aia_server_administration_guide), appending `kc_action` to the auth request: `CONFIGURE_TOTP`, `UPDATE_PASSWORD`, `UPDATE_PROFILE`, `UPDATE_EMAIL`, `VERIFY_EMAIL`.
 
-#### Identity providers
-
-**Publish Keycloak on the port it thinks it is on.** Testing a real provider — GitHub, Google — fails otherwise, with `Unexpected error when authenticating with identity provider` and HTTP 502, which reads like a theme or network problem and is neither.
-
-Keycloak builds the `redirect_uri` it sends the provider from its own frontend URL, not from the request it is answering, and it sends that same string twice: once in the browser redirect, and again server-to-server when it exchanges the code. The provider requires the two to match. So if Keycloak is told it lives on one port (`KC_HOSTNAME_PORT`, or a `hostname` URL) while the browser reaches it on another, one of the two legs is always wrong: register the address that works in the browser and the token exchange is rejected as a `redirect_uri` mismatch; register the address Keycloak advertises and the browser cannot reach it at all. Keycloak reports the first as an unexpected error, because all it sees is a token response it cannot parse.
-
-The `start-dev` command above is safe — with no hostname configured Keycloak derives it from the request. A full OpenRemote stack is not: it sets `KC_HOSTNAME_PORT=8080` and is commonly published on 8081. Check with
-
-```shell
-curl -s http://localhost:8081/auth/realms/master/.well-known/openid-configuration | grep -o '"issuer":"[^"]*"'
-```
-
-and make the port in `issuer` the port you browse to. When it does go wrong the cause is in the server log, never on the page — `docker logs <container> | grep -A20 'identity provider'`.
-
 To read Keycloak's own templates and message bundle for reference — which is the fastest way to answer "what does Keycloak do here?" — take them from Maven rather than from a container:
 
 ```shell
@@ -149,7 +135,7 @@ Unless a case says otherwise, every one of them should also be checked for the f
 - Submitting empty is refused by the fields themselves, with no request sent.
 - "Forgot password?" and "New user? Register" go to the right pages — and are **absent** on the realm that has those features off.
 - The username label reads "Username or email" with login-with-email on, "Username" without it.
-- One button per identity provider, and clicking one reaches the provider (see [Identity providers](#identity-providers) above for the port trap that makes this fail).
+- One button per identity provider, and clicking one reaches the provider.
 
 #### Registration
 
