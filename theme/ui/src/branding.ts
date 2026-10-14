@@ -273,17 +273,22 @@ export function armReveal(): void {
  * showing the previous image until the new one decodes, so the page has to stay hidden until
  * this resolves. Everything else here (title, color) applies synchronously; only this does not.
  *
- * decode() rejects on a broken or missing image, in which case the default logo stays, the
- * right outcome, and better than an empty space.
+ * A logo that fails to decode leaves the one on screen untouched, rather than replacing it with
+ * a broken image.
  */
 async function swapLogo(image: HTMLImageElement, src: string): Promise<void> {
-  image.src = src;
+  const replacement = new Image();
+
+  replacement.src = src;
 
   try {
-    await image.decode();
+    await replacement.decode();
   } catch {
-    // Keep whatever is on screen.
+    // Keep the logo that is on screen.
+    return;
   }
+
+  image.src = src;
 }
 
 /**
