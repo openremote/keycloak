@@ -7,7 +7,7 @@
  */
 import "./styles/index.css";
 import type { KcContext } from "./login/KcContext";
-import { applyBranding, applyFavicon, armReveal } from "./branding";
+import { applyBranding, applyFavicon, armReveal, stylesApplied } from "./branding";
 import { applyTheme, renderPage } from "./render";
 
 declare global {
@@ -48,6 +48,10 @@ async function main(): Promise<void> {
 
   // Before rendering, so a page that throws still gets revealed rather than staying hidden.
   armReveal();
+
+  // Rendered only once the stylesheets are in force: Vaadin takes the styles it injects into a
+  // component from the document's stylesheets at the moment that component first connects.
+  await stylesApplied();
 
   renderPage(kcContext, root);
 

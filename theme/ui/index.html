@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <title>OpenRemote</title>
+    <style>
+      /* Inline, not in login.css: a stylesheet that is still loading cannot hide anything,
+         and WebKit runs the bundle before the ones in the markup are applied. */
+      html.or-booting body {
+        visibility: hidden;
+      }
+    </style>
     <script>
       // Resolve the color scheme before first paint, so a dark page never flashes light
       // while the bundle boots. main.ts applies the same rule once it runs; this only moves

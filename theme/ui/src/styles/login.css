@@ -14,14 +14,11 @@
  * Boot
  * ------------------------------------------------------------------------ */
 
-/* Hidden only until the realm's branding lands, so the stock logo, title and palette do not
-   paint and then visibly flip. The class is added by the inline script in index.html and
-   removed by applyBranding (see src/branding.ts). main.ts arms the timeout that stops this
-   ever being permanent before it renders, so even a page that fails to render is shown.
-   Never applied at all when JavaScript is off. */
-html.or-booting body {
-  visibility: hidden;
-}
+/* The page is hidden while it boots, so the stock logo, title and palette do not paint and
+   then visibly flip. Both halves live in index.html, the class and the rule it acts on, because
+   this file is not necessarily applied yet when the bundle runs. src/branding.ts takes the class
+   off again, and main.ts arms a timeout so it can never be permanent. Never applied at all when
+   JavaScript is off. */
 
 /* --------------------------------------------------------------------------
  * Page

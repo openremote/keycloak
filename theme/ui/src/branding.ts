@@ -81,6 +81,84 @@ export function applyFavicon(kcContext: KcContext): void {
   setFavicon(`${resourcesPath}/dist/favicon.png`);
 }
 
+/**
+ * Whether `link`'s stylesheet is in force.
+ *
+ * `link.sheet` alone does not say: WebKit attaches an empty sheet to a link that is still
+ * loading, so no rules means either that or an empty file. A resource timing entry appears only
+ * once the fetch is over, which separates the two.
+ */
+function settled(link: HTMLLinkElement): boolean {
+  try {
+    if (link.sheet !== null && link.sheet.cssRules.length > 0) {
+      return true;
+    }
+  } catch {
+    // Another origin: the sheet exists but its rules cannot be read.
+    return true;
+  }
+
+  return performance.getEntriesByType("resource").some(entry => entry.name === link.href);
+}
+
+/**
+ * How long a stylesheet that failed is given before the page gives up on it.
+ *
+ * Not a network allowance, the request is over: a failed stylesheet usually means the page is
+ * being navigated away from, and a document about to be replaced must not show itself unstyled.
+ */
+const FAILED_STYLESHEET_GRACE_MS = 400;
+
+/**
+ * Resolves once each of `links` is applied to the document, or has failed to load.
+ *
+ * Failure resolves rather than rejects: a stylesheet that 404s must not hold the page back for
+ * good. Links that settled before this ran are not waited for, so an event already missed cannot
+ * strand it.
+ */
+function applied(links: Iterable<HTMLLinkElement>): Promise<unknown> {
+  return Promise.all(
+    [...links].map(
+      link =>
+        new Promise<void>(resolve => {
+          if (settled(link)) {
+            resolve();
+            return;
+          }
+
+          link.addEventListener("load", () => resolve(), { once: true });
+          link.addEventListener(
+            "error",
+            () => setTimeout(resolve, FAILED_STYLESHEET_GRACE_MS),
+            { once: true }
+          );
+        })
+    )
+  );
+}
+
+/*
+ * The stylesheets the page was served with, captured as this module is evaluated.
+ *
+ * WebKit runs a deferred script without waiting for them, where Blink and Gecko hold it back
+ * until they are applied. Only the real build has any to wait for: the dev server injects its
+ * CSS from JavaScript.
+ */
+const documentStyles = applied(
+  document.querySelectorAll<HTMLLinkElement>('link[rel~="stylesheet"]')
+);
+
+/**
+ * Resolves once the stylesheets the page is meant to have are applied to it.
+ *
+ * Exported because the page must not be rendered before this either: Vaadin takes the styles it
+ * injects into a component from the document's stylesheets when the first component of that tag
+ * connects, and caches that per tag.
+ */
+export function stylesApplied(): Promise<unknown> {
+  return documentStyles;
+}
+
 function resolveAsset(path: string | undefined, base: string): string | null {
   if (!path) {
     return null;
@@ -156,6 +234,22 @@ export function reveal(): void {
   }
 }
 
+/**
+ * Reveals the page, once the stylesheets it is meant to have are applied to it.
+ *
+ * Uncapped, deliberately: Blink and Gecko paint nothing at all until a stylesheet in the markup
+ * has loaded, so waiting here is parity with them.
+ */
+async function revealStyled(): Promise<void> {
+  await stylesApplied();
+
+  // A stylesheet reporting itself loaded is not the page having been restyled with it: WebKit
+  // updates the document's own properties first and the components' shadow DOM a frame later.
+  await new Promise(resolve => requestAnimationFrame(resolve));
+
+  reveal();
+}
+
 /** Long enough for a same-origin fetch on a normal connection, short enough not to be felt. */
 const REVEAL_TIMEOUT_MS = 400;
 
@@ -165,9 +259,11 @@ const REVEAL_TIMEOUT_MS = 400;
  * Armed by main() before the page is rendered rather than from applyBranding: a page that
  * throws while rendering would otherwise never reach applyBranding, and index.html has
  * already hidden the body.
+ *
+ * The deadline is on the manager, not on the stylesheets, so it goes through revealStyled.
  */
 export function armReveal(): void {
-  setTimeout(reveal, REVEAL_TIMEOUT_MS);
+  setTimeout(() => void revealStyled(), REVEAL_TIMEOUT_MS);
 }
 
 /**
@@ -369,7 +465,7 @@ export async function applyBranding(kcContext: KcContext): Promise<void> {
    */
   if (cached) {
     await apply(cached);
-    reveal();
+    await revealStyled();
   }
 
   try {
@@ -399,6 +495,6 @@ export async function applyBranding(kcContext: KcContext): Promise<void> {
       error
     );
   } finally {
-    reveal();
+    await revealStyled();
   }
 }
