@@ -40,7 +40,9 @@ export default {
     ]
   },
   plugins: [
-    new HtmlRspackPlugin({ template: "./index.html" }),
+    // inject: false because index.html places the tags itself, before the script that writes
+    // a child theme's stylesheets. Injected, they would land after those and win the ties.
+    new HtmlRspackPlugin({ template: "./index.html", inject: false }),
     // public/ is served directly by the dev server but must be copied for the real build,
     // otherwise the default logo 404s inside Keycloak.
     //
