@@ -18,6 +18,9 @@ on:
       - 'theme/ui/src/**'
       - 'theme/ui/scripts/check-keycloak-drift.mjs'
       - '.github/workflows/keycloak-drift.yml'
+      # The check reads keycloakify's bundled message set, so an upgrade of it changes the answer.
+      - 'theme/ui/package.json'
+      - 'theme/ui/yarn.lock'
 
   pull_request:
     paths:
@@ -25,6 +28,8 @@ on:
       - 'theme/ui/src/**'
       - 'theme/ui/scripts/check-keycloak-drift.mjs'
       - '.github/workflows/keycloak-drift.yml'
+      - 'theme/ui/package.json'
+      - 'theme/ui/yarn.lock'
 
   workflow_dispatch:
 
