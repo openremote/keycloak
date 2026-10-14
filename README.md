@@ -227,6 +227,13 @@ orStyles=css/custom.css
 
 The stylesheets in `orStyles` are loaded after the theme's own, so they win where specificity ties, and paths resolve against that theme's `resources` directory exactly as Keycloak's `styles=` does. With `--spi-theme-cache-themes=false --spi-theme-static-max-age=-1` on the container, editing the file is a browser refresh.
 
+They are written into the page's `<head>` by an inline script in the generated template, so they block the first paint rather than arriving after it, and the page is never painted in this theme's styling first. A child theme's stylesheet is therefore on the critical path, exactly as Keycloak's `styles=` is: a slow one is a slow login page.
+
+Two things the page cannot hold back for you:
+
+- **Fonts.** A font never blocks the page. A `@font-face` with `font-display: swap`, which Google Fonts' URLs ask for, paints in a fallback first and swaps when the font arrives. Self-host the font and declare `font-display: block` or `optional` if that swap is visible.
+- **Entrance animations and transitions.** The page is hidden while the realm's branding loads: an animation that runs during that time is over before anyone sees it, and a transition the branding sets off is still running when the page appears. Scope them under `html:not(.or-booting)`.
+
 `orStyles` rather than Keycloak's own `styles=`, because that property is inherited from the fallback theme and is what the pages this theme does not implement are rendered with: reading it would put the fallback theme's stylesheet on these pages, and declaring our own would take it away from theirs.
 
 Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. It cannot override messages: every string in these pages comes from the compiled bundle.

@@ -39,8 +39,43 @@
         document.documentElement.classList.add("or-booting");
       })();
     </script>
+    <% for tag in htmlRspackPlugin.tags.headTags { %><%= toHtml(tag) %><% } %>
+    <script>
+      /*
+       * A child theme's stylesheets, written out while the parser is still in the head, so they
+       * block the first paint exactly as Keycloak's own `styles=` does. Appended from the bundle
+       * instead, they arrived after the page had been built and painted with the theme's own
+       * styling, and it visibly flipped.
+       *
+       * After the bundle's tags above, so a child theme wins where specificity ties.
+       *
+       * Nothing here may use a template literal or `$` followed by a brace: the build turns this
+       * file into a FreeMarker template, where that is an interpolation.
+       */
+      (function () {
+        const kcContext = window.kcContext;
+        const declared = kcContext && kcContext.properties && kcContext.properties.orStyles;
+        const resourcesPath = kcContext && kcContext.url && kcContext.url.resourcesPath;
+
+        if (!declared || !resourcesPath) {
+          return;
+        }
+
+        for (const path of declared.trim().split(/\s+/)) {
+          const link = document.createElement("link");
+
+          link.rel = "stylesheet";
+          link.href = /^(?:https?:)?\/\//.test(path) ? path : resourcesPath + "/" + path;
+
+          // Serialized by the DOM rather than built by hand, so an & or a " in the path arrives
+          // as it was written.
+          document.write(link.outerHTML);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
+    <% for tag in htmlRspackPlugin.tags.bodyTags { %><%= toHtml(tag) %><% } %>
   </body>
 </html>
