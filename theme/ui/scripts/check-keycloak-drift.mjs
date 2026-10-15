@@ -56,9 +56,9 @@ const UPSTREAM_ONLY = new Set();
  * rewrites the generated `parent=` to it.
  *
  * The default comes from the line theme/build.gradle resolves it from, and
- * ORG_GRADLE_PROJECT_loginParentTheme overrides it, that being the one way Gradle takes the
- * property that is also visible from here. A `-PloginParentTheme` on a Gradle command line is not:
- * to check a build that passes one, pass the same value in the environment.
+ * ORG_GRADLE_PROJECT_loginParentTheme overrides it as it does for Gradle. A `-PloginParentTheme` on
+ * a Gradle command line, or an entry in a gradle.properties, is not seen: to check a build that uses
+ * one, pass the same value in the environment.
  */
 function parentTheme() {
   const build = readFileSync(join(REPO_ROOT, "theme", "build.gradle"), "utf8");
@@ -256,9 +256,9 @@ function templateText(root, name) {
 
 /*
  * The given templates plus everything they `<#import>`, transitively, each import resolved the way
- * Keycloak resolves it: the theme's own file when it has one, base otherwise. Names that do not
- * exist are dropped, and only the literal import form is read, which is the only one Keycloak's
- * own templates use.
+ * Keycloak resolves it: through the theme serving the page, whichever theme the importing file came
+ * from, so base/error.ftl imports keycloak.v2's template.ftl. Names that do not exist are dropped,
+ * and only the literal import form is read, which is the only one Keycloak's own templates use.
  *
  * The page files alone were not enough: 26.8.0 redesigned the identity provider buttons inside
  * social-providers.ftl and left the login.ftl that imports it untouched.
@@ -277,17 +277,8 @@ function withImports(root, names) {
 
     seen.add(name);
 
-    const [theme] = name.split("/");
-
     for (const match of source.matchAll(/<#import\s+"([^"]+\.ftl)"/g)) {
-      const basename = match[1].replace(/^.*\//, "");
-      const resolved = [`${theme}/${basename}`, `base/${basename}`].find(
-        candidate => templateText(root, candidate) !== undefined
-      );
-
-      if (resolved !== undefined) {
-        queue.push(resolved);
-      }
+      queue.push(...asServed(root, [match[1].replace(/^.*\//, "")]));
     }
   }
 
@@ -433,140 +424,56 @@ function keyArgument(source, start) {
 }
 
 function sourceFiles(dir) {
-  const files = [];
-
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-
-    // src/dev never ships, and its strings are the harness's own.
-    if (entry.isDirectory()) {
-      if (entry.name !== "dev") {
-        files.push(...sourceFiles(path));
-      }
-    } else if (entry.name.endsWith(".ts")) {
-      files.push(path);
-    }
-  }
-
-  return files;
+  // src/dev never ships, and its strings are the harness's own.
+  return readdirSync(dir, { recursive: true })
+    .filter(path => path.endsWith(".ts") && !/^dev[\\/]/.test(path))
+    .map(path => join(dir, path));
 }
+
+/*
+ * One token of TypeScript, close enough to read i18n.ts by: a comment, a string, a word, or any
+ * other character but whitespace. Read whole, a URL inside a message does not start a comment, and
+ * a brace or a colon inside one is not structure.
+ */
+const TOKEN = /(?<comment>\/\/[^\n]*|\/\*[\s\S]*?\*\/)|(?<quote>["'`])(?<string>(?:\\[\s\S]|(?!\k<quote>)[^\\])*)\k<quote>|(?<word>\w+)|\S/g;
 
 /**
  * The keys declared in i18n.ts's withCustomTranslations block.
  *
- * Read by walking the source rather than by matching indentation, so reformatting that file cannot
- * quietly turn this into an empty list. Depth 2 is a message key: depth 1 is the argument, whose
- * own keys are the language tags the block is organized by.
- *
- * Comments and strings are stepped over where they are met rather than stripped beforehand: a URL
- * inside a message does not start a comment, and a brace or a colon inside one is not structure.
- * The call itself is found the same way, so a comment that writes it out is not taken for it.
- *
- * A key is the token a property opens with, quoted or not, so the prose after it cannot name one.
+ * Read from its tokens rather than by matching indentation, so reformatting that file cannot
+ * quietly turn this into an empty list, and a comment that writes the call out is not taken for
+ * it. Depth 2 is a message key: depth 1 is the argument, whose own keys are the language tags the
+ * block is organized by. A key is the string or word a property opens with, so the prose after it
+ * cannot name one.
  */
 function customTranslationKeys() {
-  const source = readFileSync(join(UI_DIR, "src", "i18n.ts"), "utf8");
-  const keys = [];
+  const tokens = [...readFileSync(join(UI_DIR, "src", "i18n.ts"), "utf8").matchAll(TOKEN)].filter(
+    token => token.groups.comment === undefined
+  );
+  const start = tokens.findIndex(
+    (token, i) => token.groups.word === "withCustomTranslations" && tokens[i + 1]?.[0] === "("
+  );
 
-  let found = false;
-  let depth = 0;
-  let opens = false;
-  let token;
-
-  for (let i = 0; i < source.length; ) {
-    const character = source[i];
-
-    if (character === "/" && (source[i + 1] === "/" || source[i + 1] === "*")) {
-      i = commentEnd(source, i);
-      continue;
-    }
-
-    if (character === '"' || character === "'" || character === "`") {
-      const end = stringEnd(source, i);
-
-      token = source.slice(i + 1, end - 1);
-      i = end;
-      continue;
-    }
-
-    if (/\w/.test(character)) {
-      const end = tokenEnd(source, i);
-
-      token = source.slice(i, end);
-      i = end;
-      continue;
-    }
-
-    if (character === "(") {
-      found = found || token === "withCustomTranslations";
-    } else if (character === "{") {
-      if (found) {
-        depth++;
-      }
-
-      opens = true;
-    } else if (character === "}") {
-      if (depth > 0 && --depth === 0) {
-        break;
-      }
-
-      opens = false;
-    } else if (character === ",") {
-      opens = true;
-    } else if (character === ":") {
-      if (depth === 2 && opens && token !== undefined) {
-        keys.push(token);
-      }
-
-      opens = false;
-    }
-
-    /* Whitespace does not end a property name: `alpha : "A"` and a colon on its own line name alpha. */
-    if (!/\s/.test(character)) {
-      token = undefined;
-    }
-
-    i++;
-  }
-
-  if (!found) {
+  if (start === -1) {
     throw new Error("No withCustomTranslations call in src/i18n.ts");
   }
 
-  return keys;
-}
+  const keys = [];
+  let depth = 0;
 
-/* Just past the comment that starts at `i`. */
-function commentEnd(source, i) {
-  const end = source[i + 1] === "/" ? source.indexOf("\n", i) : source.indexOf("*/", i) + 1;
+  for (let i = start + 2; i < tokens.length; i++) {
+    const text = tokens[i][0];
 
-  return end <= i ? source.length : end + 1;
-}
-
-/* Just past the string that starts at `i`, escapes and all. */
-function stringEnd(source, i) {
-  const quote = source[i];
-
-  for (let j = i + 1; j < source.length; j++) {
-    if (source[j] === "\\") {
-      j++;
-    } else if (source[j] === quote) {
-      return j + 1;
+    if (text === "{") {
+      depth++;
+    } else if (text === "}" && --depth === 0) {
+      break;
+    } else if (text === ":" && depth === 2 && ["{", ","].includes(tokens[i - 2][0])) {
+      keys.push(tokens[i - 1].groups.string ?? tokens[i - 1].groups.word);
     }
   }
 
-  return source.length;
-}
-
-/* Just past the bare word that starts at `i`. */
-function tokenEnd(source, i) {
-  let end = i;
-
-  while (end < source.length && /\w/.test(source[end])) {
-    end++;
-  }
-
-  return end;
+  return keys;
 }
 
 const version = pinnedVersion(readFileSync(join(REPO_ROOT, "Dockerfile"), "utf8"));

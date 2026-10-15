@@ -102,7 +102,7 @@ What it watches is our pages' upstream counterparts closed over `<#import>`, not
 
 It needs `unzip` or a JDK, and downloads Keycloak's themes jar once per version into `.keycloak-cache/`, checked against the checksum Maven Central publishes beside it.
 
-Which of Keycloak's own themes our pages are compared against is the one they would fall through to: `loginParentTheme` from `theme/build.gradle`, which is `keycloak.v2` unless the build is given another, plus `base` for every file that theme does not override. To check against a different one, set `ORG_GRADLE_PROJECT_loginParentTheme`, the environment variable Gradle also reads for that property. A `-PloginParentTheme` on a Gradle command line is not visible to the check.
+Which of Keycloak's own themes our pages are compared against is the one they would fall through to: `loginParentTheme` from `theme/build.gradle`, which is `keycloak.v2` unless the build is given another, plus `base` for every file that theme does not override. To check against a different one, set `ORG_GRADLE_PROJECT_loginParentTheme`, the environment variable Gradle also reads for that property. A `-PloginParentTheme` on a Gradle command line, or an entry in a `gradle.properties`, is not visible to the check.
 
 ### What it does not cover
 
