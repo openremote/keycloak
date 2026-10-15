@@ -13,7 +13,7 @@
  * version of that page is a judgment and nothing here can make it.
  */
 import { execFileSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -67,7 +67,10 @@ function git(...args) {
  * whether *this* change bumps Keycloak, not when the last bump was.
  */
 function versionBranchedFrom(version) {
-  for (const ref of ["origin/main", "main"]) {
+  /* The branch a pull request targets first: one stacked on another branch did not come from main. */
+  const target = process.env.GITHUB_BASE_REF;
+
+  for (const ref of [...(target ? [`origin/${target}`] : []), "origin/main", "main"]) {
     try {
       const base = git("merge-base", "HEAD", ref);
       const before = pinnedVersion(git("show", `${base}:Dockerfile`));
@@ -85,7 +88,7 @@ function versionBranchedFrom(version) {
 async function themesRoot(version) {
   const extracted = join(CACHE_DIR, version);
 
-  if (existsSync(join(extracted, "theme", "base", "login"))) {
+  if (existsSync(messagesFile(extracted))) {
     return extracted;
   }
 
@@ -95,9 +98,14 @@ async function themesRoot(version) {
     await download(version, jar);
   }
 
+  /* Unpacked beside the cache and renamed in, so an extraction cut short is never read as one. */
+  const partial = `${extracted}.partial`;
+
+  rmSync(partial, { recursive: true, force: true });
   rmSync(extracted, { recursive: true, force: true });
-  mkdirSync(extracted, { recursive: true });
-  unpack(jar, extracted);
+  mkdirSync(partial, { recursive: true });
+  unpack(jar, partial);
+  renameSync(partial, extracted);
 
   return extracted;
 }
@@ -123,11 +131,14 @@ async function download(version, jar) {
  * Either unzip or the JDK's jar, whichever the machine has: unzip is on the runners, jar comes
  * with the toolchain this repo already builds with. A zip reader of our own would be more code
  * here than either is trouble.
+ *
+ * All 2 MB of it, rather than the login directories a pattern would pick out: how a pattern expands
+ * across `/` differs between unzip builds, and Git for Windows' leaves the messages behind.
  */
 function unpack(jar, into) {
   const tools = [
-    { command: "unzip", args: ["-q", "-o", jar, "theme/*/login/*", "-d", into] },
-    { command: "jar", args: ["xf", jar, "theme"], options: { cwd: into } }
+    { command: "unzip", args: ["-q", "-o", jar, "-d", into] },
+    { command: "jar", args: ["xf", jar], options: { cwd: into } }
   ];
 
   for (const tool of tools) {
@@ -170,6 +181,11 @@ function implementedPages() {
 
 function loginDir(root, theme) {
   return join(root, "theme", theme, "login");
+}
+
+/** Keycloak's English bundle, which is also what an extraction is judged complete by. */
+function messagesFile(root) {
+  return join(loginDir(root, "base"), "messages", "messages_en.properties");
 }
 
 /** Every theme's copy of the given basenames, as `<theme>/<file>`. */
@@ -247,13 +263,20 @@ function isPage(root, name) {
   return (templateText(root, name) ?? "").includes("registrationLayout");
 }
 
-/** Keys the given templates name outright, which is how Keycloak's own pages name theirs. */
+/*
+ * Keys the given templates name: through `msg("...")`, or as the label of one of keycloak.v2's
+ * macros, which resolve it themselves. `<@buttons.button label="doSubmit"/>` renders `${msg(label)}`,
+ * and that is how the buttons on most of the pages we implement are written.
+ *
+ * A space before `label` rather than a word boundary, which would take `aria-label` with it, and no
+ * `$` in the value, because an interpolated one is not a key until FreeMarker has resolved it.
+ */
 function templateMessageKeys(root, names) {
   const keys = new Set();
 
   for (const name of names) {
-    for (const match of (templateText(root, name) ?? "").matchAll(/\bmsg\("([^"]+)"/g)) {
-      keys.add(match[1]);
+    for (const match of (templateText(root, name) ?? "").matchAll(/\bmsg\("([^"]+)"|\slabel="([^"$]+)"/g)) {
+      keys.add(match[1] ?? match[2]);
     }
   }
 
@@ -267,7 +290,7 @@ function templateMessageKeys(root, names) {
  * cannot invent one.
  */
 function keycloakMessages(root) {
-  const properties = readFileSync(join(loginDir(root, "base"), "messages", "messages_en.properties"), "latin1");
+  const properties = readFileSync(messagesFile(root), "utf8");
   const messages = new Map();
 
   for (const line of properties.split("\n")) {
@@ -433,6 +456,10 @@ if (!counterparts.some(name => isPage(root, name))) {
 
 if (upstreamKeys.size === 0) {
   problems.push(`No \`msg("...")\` resolves in Keycloak's versions of our pages, so the report cannot see a control it relabelled. Fix \`templateMessageKeys\` in ${SCRIPT}.`);
+}
+
+if (!counterparts.some(name => /\slabel="[^"$]+"/.test(templateText(root, name) ?? ""))) {
+  problems.push(`No macro label resolves in Keycloak's versions of our pages, so the report cannot see a button it relabelled. Fix \`templateMessageKeys\` in ${SCRIPT}.`);
 }
 
 if (problems.length > 0) {
