@@ -17,6 +17,10 @@ on:
       - 'Dockerfile'
       - 'theme/ui/src/**'
       - 'theme/ui/scripts/check-keycloak-drift.mjs'
+      # Read by the check: which pages the theme implements, and the parent theme the rest fall
+      # through to.
+      - 'theme/ui/scripts/implemented-pages.mjs'
+      - 'theme/build.gradle'
       - '.github/workflows/keycloak-drift.yml'
       # The check reads keycloakify's bundled message set, so an upgrade of it changes the answer.
       - 'theme/ui/package.json'
@@ -27,6 +31,10 @@ on:
       - 'Dockerfile'
       - 'theme/ui/src/**'
       - 'theme/ui/scripts/check-keycloak-drift.mjs'
+      # Read by the check: which pages the theme implements, and the parent theme the rest fall
+      # through to.
+      - 'theme/ui/scripts/implemented-pages.mjs'
+      - 'theme/build.gradle'
       - '.github/workflows/keycloak-drift.yml'
       - 'theme/ui/package.json'
       - 'theme/ui/yarn.lock'

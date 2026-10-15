@@ -16,6 +16,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { implementedPages } from "./implemented-pages.mjs";
 
 const UI_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO_ROOT = resolve(UI_DIR, "..", "..");
@@ -24,8 +25,8 @@ const CACHE_DIR = join(UI_DIR, ".keycloak-cache");
 /* Where the lists below live, so a failure cleared by editing one says where to go. */
 const SCRIPT = relative(REPO_ROOT, fileURLToPath(import.meta.url));
 
-/* keycloak.v2 is what unimplemented pages fall through to; base is what both are built on. */
-const THEMES = ["base", "keycloak.v2"];
+/* The theme unimplemented pages fall through to, and base, which every theme is built on. */
+const THEMES = ["base", parentTheme()];
 
 /* Rendered by every page, so a change here reaches ours whether or not their own file moved. */
 const SHARED_TEMPLATES = ["template.ftl", "user-profile-commons.ftl"];
@@ -45,6 +46,23 @@ const UNDEFINED_UPSTREAM = new Set(["languages"]);
  * Both lists are checked in both directions, so an entry that stops being true says so.
  */
 const UPSTREAM_ONLY = new Set();
+
+/*
+ * The theme a page this one does not implement is served from, which is configurable: the build
+ * rewrites the generated `parent=` to it. Read from the line theme/build.gradle resolves it from,
+ * and overridden by the environment variable Gradle itself reads for that property, so a build that
+ * passes -PloginParentTheme is checked against the theme it serves rather than the default.
+ */
+function parentTheme() {
+  const build = readFileSync(join(REPO_ROOT, "theme", "build.gradle"), "utf8");
+  const match = /gradleProperty\(['"]loginParentTheme['"]\)\s*\.getOrElse\(['"]([^'"]+)['"]\)/.exec(build);
+
+  if (match === null) {
+    throw new Error("No `loginParentTheme` default in theme/build.gradle");
+  }
+
+  return process.env.ORG_GRADLE_PROJECT_loginParentTheme ?? match[1];
+}
 
 function pinnedVersion(dockerfile) {
   const match = /^ARG VERSION=(\S+)\s*$/m.exec(dockerfile);
@@ -153,30 +171,6 @@ function unpack(jar, into) {
   }
 
   throw new Error("Neither `unzip` nor `jar` is on the PATH, and one of them has to be.");
-}
-
-/** The pages this theme implements, read the way scripts/write-implemented-pages.mjs reads them. */
-function implementedPages() {
-  const dir = join(UI_DIR, "src", "pages");
-  const pages = new Set();
-
-  for (const basename of readdirSync(dir)) {
-    if (!basename.endsWith(".ts")) {
-      continue;
-    }
-
-    const match = /export const pageId\s*=\s*"([^"]+)"/.exec(readFileSync(join(dir, basename), "utf8"));
-
-    if (match !== null) {
-      pages.add(match[1]);
-    }
-  }
-
-  if (pages.size === 0) {
-    throw new Error("No page implementations found in src/pages");
-  }
-
-  return [...pages].sort();
 }
 
 function loginDir(root, theme) {
@@ -304,17 +298,52 @@ function keycloakMessages(root) {
   return messages;
 }
 
-/** Keys this theme names outright. Anything assembled at runtime goes through advancedMsgStr. */
+/*
+ * Keys this theme names. Every literal in the key argument rather than only one straight after the
+ * paren, because a page may choose between two keys and both are rendered somewhere:
+ * `msgStr(realm.duplicateEmailsAllowed ? "emailInstructionUsername" : "emailInstruction")`.
+ *
+ * The key argument alone: what follows it are values interpolated into the message, and a literal
+ * among those is not a key. A key assembled at runtime is not a literal and cannot be checked here,
+ * which is what advancedMsgStr is for.
+ */
 function requestedMessageKeys() {
   const keys = new Set();
 
   for (const file of sourceFiles(join(UI_DIR, "src"))) {
-    for (const match of readFileSync(file, "utf8").matchAll(/\b(?:msgStr|advancedMsgStr)\("([^"$]+)"/g)) {
-      keys.add(match[1]);
+    const source = readFileSync(file, "utf8");
+
+    for (const call of source.matchAll(/\b(?:msgStr|advancedMsgStr)\(/g)) {
+      const argument = keyArgument(source, call.index + call[0].length);
+
+      for (const match of argument.matchAll(/"([^"$]+)"/g)) {
+        keys.add(match[1]);
+      }
     }
   }
 
   return [...keys].sort();
+}
+
+/* The first argument of the call whose parenthesis `start` follows: up to the comma that ends it. */
+function keyArgument(source, start) {
+  let depth = 0;
+
+  for (let i = start; i < source.length; i++) {
+    const character = source[i];
+
+    if (depth === 0 && (character === "," || character === ")")) {
+      return source.slice(start, i);
+    }
+
+    if ("([{".includes(character)) {
+      depth++;
+    } else if (")]}".includes(character)) {
+      depth--;
+    }
+  }
+
+  return source.slice(start);
 }
 
 function sourceFiles(dir) {
@@ -339,15 +368,16 @@ function sourceFiles(dir) {
 /**
  * The keys declared in i18n.ts's withCustomTranslations block.
  *
- * Read by walking braces rather than by matching indentation, so reformatting that file cannot
+ * Read by walking the source rather than by matching indentation, so reformatting that file cannot
  * quietly turn this into an empty list. Depth 2 is a message key: depth 1 is the argument, whose
  * own keys are the language tags the block is organized by.
+ *
+ * Comments and strings are stepped over where they are met rather than stripped beforehand: a URL
+ * inside a message does not start a comment, and a brace or a colon inside one is not structure. A
+ * key is the token a property opens with, quoted or not, so the prose after it cannot name one.
  */
 function customTranslationKeys() {
-  const source = readFileSync(join(UI_DIR, "src", "i18n.ts"), "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/[^\n]*/g, "");
-
+  const source = readFileSync(join(UI_DIR, "src", "i18n.ts"), "utf8");
   const start = source.indexOf("withCustomTranslations(");
 
   if (start === -1) {
@@ -356,37 +386,102 @@ function customTranslationKeys() {
 
   const keys = [];
   let depth = 0;
+  let opens = false;
+  let token;
 
-  for (let i = source.indexOf("{", start); i < source.length; i++) {
-    if (source[i] === "{") {
-      depth++;
+  for (let i = source.indexOf("{", start); i < source.length; ) {
+    const character = source[i];
+
+    if (character === "/" && (source[i + 1] === "/" || source[i + 1] === "*")) {
+      i = commentEnd(source, i);
       continue;
     }
 
-    if (source[i] === "}") {
+    if (character === '"' || character === "'" || character === "`") {
+      const end = stringEnd(source, i);
+
+      token = source.slice(i + 1, end - 1);
+      i = end;
+      continue;
+    }
+
+    if (/[\w.-]/.test(character)) {
+      const end = tokenEnd(source, i);
+
+      token = source.slice(i, end);
+      i = end;
+      continue;
+    }
+
+    if (character === "{") {
+      depth++;
+      opens = true;
+    } else if (character === "}") {
       depth--;
 
       if (depth === 0) {
         break;
       }
 
-      continue;
-    }
-
-    if (depth === 2) {
-      const match = /^(\w+)\s*:/.exec(source.slice(i));
-
-      if (match !== null && /[\s{,]/.test(source[i - 1])) {
-        keys.push(match[1]);
+      opens = false;
+    } else if (character === ",") {
+      opens = true;
+    } else if (character === ":") {
+      if (depth === 2 && opens && token !== undefined) {
+        keys.push(token);
       }
+
+      opens = false;
     }
+
+    token = undefined;
+    i++;
   }
 
   return keys;
 }
 
+/* Just past the comment that starts at `i`. */
+function commentEnd(source, i) {
+  const end = source[i + 1] === "/" ? source.indexOf("\n", i) : source.indexOf("*/", i) + 1;
+
+  return end <= i ? source.length : end + 1;
+}
+
+/* Just past the string that starts at `i`, escapes and all. */
+function stringEnd(source, i) {
+  const quote = source[i];
+
+  for (let j = i + 1; j < source.length; j++) {
+    if (source[j] === "\\") {
+      j++;
+    } else if (source[j] === quote) {
+      return j + 1;
+    }
+  }
+
+  return source.length;
+}
+
+/* Just past the bare word that starts at `i`. */
+function tokenEnd(source, i) {
+  let end = i;
+
+  while (end < source.length && /[\w.-]/.test(source[end])) {
+    end++;
+  }
+
+  return end;
+}
+
 const version = pinnedVersion(readFileSync(join(REPO_ROOT, "Dockerfile"), "utf8"));
 const root = await themesRoot(version);
+
+for (const theme of THEMES) {
+  if (!existsSync(loginDir(root, theme))) {
+    throw new Error(`Keycloak ${version} ships no "${theme}" login theme. Check \`loginParentTheme\` in theme/build.gradle.`);
+  }
+}
 
 const pages = implementedPages();
 const names = new Set(templateNames(root));
@@ -422,6 +517,11 @@ for (const key of UNDEFINED_UPSTREAM) {
   }
 }
 
+/*
+ * Both, not just Keycloak's own bundle: Keycloakify's is what resolves a key in the browser, so a
+ * key Keycloak defines and Keycloakify has yet to ship still needs ours, blank button otherwise.
+ * The entries in i18n.ts say which are there for that reason.
+ */
 for (const key of ourKeys) {
   if (messages.has(key) && Object.hasOwn(keycloakifyMessages, key)) {
     problems.push(
@@ -458,8 +558,11 @@ if (upstreamKeys.size === 0) {
   problems.push(`No \`msg("...")\` resolves in Keycloak's versions of our pages, so the report cannot see a control it relabelled. Fix \`templateMessageKeys\` in ${SCRIPT}.`);
 }
 
-if (!counterparts.some(name => /\slabel="[^"$]+"/.test(templateText(root, name) ?? ""))) {
-  problems.push(`No macro label resolves in Keycloak's versions of our pages, so the report cannot see a button it relabelled. Fix \`templateMessageKeys\` in ${SCRIPT}.`);
+/* Only where the parent theme renders its buttons through the macro: the older one has no pages. */
+const macroCalls = counterparts.filter(name => (templateText(root, name) ?? "").includes("<@buttons.button"));
+
+if (macroCalls.length > 0 && !macroCalls.some(name => /\slabel="[^"$]+"/.test(templateText(root, name) ?? ""))) {
+  problems.push(`No label resolves in the pages of Keycloak's that render a button through its macro, so the report cannot see one it relabelled. Fix \`templateMessageKeys\` in ${SCRIPT}.`);
 }
 
 if (problems.length > 0) {

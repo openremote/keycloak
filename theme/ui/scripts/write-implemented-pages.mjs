@@ -10,12 +10,13 @@
  *
  * The list is derived from src/pages rather than written out by hand, for the same reason
  * src/page-registry.ts scans that directory: adding a file there should be the only step
- * needed to implement a page.
+ * needed to implement a page. scripts/implemented-pages.mjs does the reading, because the
+ * Keycloak check has to answer from the same list.
  */
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { implementedPages } from "./implemented-pages.mjs";
 
-const PAGES_DIR = "src/pages";
 const OUTPUT_FILE = join("build_keycloak", "implemented-pages.txt");
 
 /*
@@ -29,31 +30,14 @@ const ALIASES = {
 
 const pageIds = new Set();
 
-for (const basename of readdirSync(PAGES_DIR)) {
-  if (!basename.endsWith(".ts")) {
-    continue;
-  }
+for (const pageId of implementedPages()) {
+  pageIds.add(pageId);
 
-  const source = readFileSync(join(PAGES_DIR, basename), "utf8");
-  // Matches `export const pageId = "login.ftl";`, the same declaration page-registry.ts
-  // reads at runtime.
-  const match = /export const pageId\s*=\s*"([^"]+)"/.exec(source);
-
-  if (match === null) {
-    continue;
-  }
-
-  pageIds.add(match[1]);
-
-  const alias = ALIASES[match[1]];
+  const alias = ALIASES[pageId];
 
   if (alias !== undefined) {
     pageIds.add(alias);
   }
-}
-
-if (pageIds.size === 0) {
-  throw new Error(`No page implementations found in ${PAGES_DIR}.`);
 }
 
 const sorted = [...pageIds].sort();
