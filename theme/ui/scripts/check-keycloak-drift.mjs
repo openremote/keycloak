@@ -13,6 +13,7 @@
  * version of that page is a judgment and nothing here can make it.
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +22,9 @@ import { implementedPages } from "./implemented-pages.mjs";
 const UI_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO_ROOT = resolve(UI_DIR, "..", "..");
 const CACHE_DIR = join(UI_DIR, ".keycloak-cache");
+
+/* Maven Central, or the job would sit on a stalled read until CI's own limit cut it off. */
+const DOWNLOAD_TIMEOUT_MS = 60_000;
 
 /* Where the lists below live, so a failure cleared by editing one says where to go. */
 const SCRIPT = relative(REPO_ROOT, fileURLToPath(import.meta.url));
@@ -49,9 +53,12 @@ const UPSTREAM_ONLY = new Set();
 
 /*
  * The theme a page this one does not implement is served from, which is configurable: the build
- * rewrites the generated `parent=` to it. Read from the line theme/build.gradle resolves it from,
- * and overridden by the environment variable Gradle itself reads for that property, so a build that
- * passes -PloginParentTheme is checked against the theme it serves rather than the default.
+ * rewrites the generated `parent=` to it.
+ *
+ * The default comes from the line theme/build.gradle resolves it from, and
+ * ORG_GRADLE_PROJECT_loginParentTheme overrides it, that being the one way Gradle takes the
+ * property that is also visible from here. A `-PloginParentTheme` on a Gradle command line is not:
+ * to check a build that passes one, pass the same value in the environment.
  */
 function parentTheme() {
   const build = readFileSync(join(REPO_ROOT, "theme", "build.gradle"), "utf8");
@@ -136,13 +143,34 @@ async function download(version, jar) {
   console.log(`Downloading ${url}`);
   mkdirSync(CACHE_DIR, { recursive: true });
 
-  const response = await fetch(url);
+  const bytes = Buffer.from(await (await get(url)).arrayBuffer());
+
+  /*
+   * Checked against the checksum beside it, and renamed in rather than written where it is read:
+   * a download cut short or mangled in transit would otherwise be cached as the jar and fail every
+   * run after it, with nothing but the path to say why.
+   */
+  const published = /[0-9a-f]{40}/.exec(await (await get(`${url}.sha1`)).text());
+  const digest = createHash("sha1").update(bytes).digest("hex");
+
+  if (published === null || digest !== published[0]) {
+    throw new Error(`${url} arrived as sha1 ${digest}, against ${published?.[0] ?? "no readable checksum"}`);
+  }
+
+  const partial = `${jar}.partial`;
+
+  writeFileSync(partial, bytes);
+  renameSync(partial, jar);
+}
+
+async function get(url) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
 
   if (!response.ok) {
     throw new Error(`${url} answered ${response.status}`);
   }
 
-  writeFileSync(jar, Buffer.from(await response.arrayBuffer()));
+  return response;
 }
 
 /*
@@ -182,9 +210,26 @@ function messagesFile(root) {
   return join(loginDir(root, "base"), "messages", "messages_en.properties");
 }
 
-/** Every theme's copy of the given basenames, as `<theme>/<file>`. */
-function inThemes(basenames) {
-  return basenames.flatMap(basename => THEMES.map(theme => `${theme}/${basename}`));
+/*
+ * Keycloak's own version of each of the given files: the parent theme's copy where it has one, base
+ * otherwise, which is how Keycloak resolves a template and how withImports resolves an import. A
+ * base copy the parent overrides is served to nobody, so a key only that copy names is not drift.
+ */
+function asServed(root, basenames) {
+  const names = [];
+
+  for (const basename of basenames) {
+    for (const theme of [...THEMES].reverse()) {
+      const name = `${theme}/${basename}`;
+
+      if (templateText(root, name) !== undefined) {
+        names.push(name);
+        break;
+      }
+    }
+  }
+
+  return names;
 }
 
 /** Every login template Keycloak ships, as `<theme>/<file>`. */
@@ -258,19 +303,35 @@ function isPage(root, name) {
 }
 
 /*
- * Keys the given templates name: through `msg("...")`, or as the label of one of keycloak.v2's
- * macros, which resolve it themselves. `<@buttons.button label="doSubmit"/>` renders `${msg(label)}`,
- * and that is how the buttons on most of the pages we implement are written.
+ * Keys the given templates name, in each of the forms Keycloak's own templates use them in:
  *
- * A space before `label` rather than a word boundary, which would take `aria-label` with it, and no
- * `$` in the value, because an interpolated one is not a key until FreeMarker has resolved it.
+ *   - `msg("doSubmit")`, and `msg('showPassword')`, which field.ftl and the base pages prefer.
+ *   - `msg(useGrid?then("identity-provider-login-label-divider", "orLabel"))`, where FreeMarker
+ *     picks between two keys, as 26.8.0's social-providers.ftl does.
+ *   - `<@buttons.button label="doSubmit"/>`, where the macro resolves it: `${msg(label)}`. That is
+ *     how the buttons on most of the pages we implement are written.
+ *
+ * The literals in the key argument, read by keyLiterals as requestedMessageKeys reads ours, so
+ * `msg(prefix + '.' + option)` in user-profile-commons.ftl names no key. A space before `label`
+ * rather than a word boundary, which would take `aria-label` with it, and no `$` in a value, because
+ * an interpolated one is not a key until FreeMarker has resolved it.
  */
 function templateMessageKeys(root, names) {
   const keys = new Set();
 
   for (const name of names) {
-    for (const match of (templateText(root, name) ?? "").matchAll(/\bmsg\("([^"]+)"|\slabel="([^"$]+)"/g)) {
-      keys.add(match[1] ?? match[2]);
+    const source = templateText(root, name) ?? "";
+
+    for (const call of source.matchAll(/\bmsg\(/g)) {
+      const argument = keyArgument(source, call.index + call[0].length);
+
+      for (const key of keyLiterals(argument, /(["'])(?<key>[^"'$]+)\1/g)) {
+        keys.add(key);
+      }
+    }
+
+    for (const match of source.matchAll(/\slabel="([^"$]+)"/g)) {
+      keys.add(match[1]);
     }
   }
 
@@ -299,7 +360,7 @@ function keycloakMessages(root) {
 }
 
 /*
- * Keys this theme names. Every literal in the key argument rather than only one straight after the
+ * Keys this theme names. The literals in the key argument rather than only one straight after the
  * paren, because a page may choose between two keys and both are rendered somewhere:
  * `msgStr(realm.duplicateEmailsAllowed ? "emailInstructionUsername" : "emailInstruction")`.
  *
@@ -316,8 +377,8 @@ function requestedMessageKeys() {
     for (const call of source.matchAll(/\b(?:msgStr|advancedMsgStr)\(/g)) {
       const argument = keyArgument(source, call.index + call[0].length);
 
-      for (const match of argument.matchAll(/"([^"$]+)"/g)) {
-        keys.add(match[1]);
+      for (const key of keyLiterals(argument, /"(?<key>[^"$]+)"/g)) {
+        keys.add(key);
       }
     }
   }
@@ -325,7 +386,32 @@ function requestedMessageKeys() {
   return [...keys].sort();
 }
 
-/* The first argument of the call whose parenthesis `start` follows: up to the comma that ends it. */
+/*
+ * The literals in a key argument that are keys, matched by `literal` into its `key` group.
+ *
+ * One that is compared against is not: `msgStr(kind === "otp" ? "a" : "b")` names a and b. Nor is
+ * one concatenated with something: `msg(prefix + '.' + option)` assembles its key at runtime, and
+ * the `.` is no more a key than the prefix is.
+ */
+function keyLiterals(argument, literal) {
+  const keys = [];
+
+  for (const match of argument.matchAll(literal)) {
+    const before = argument.slice(0, match.index);
+    const after = argument.slice(match.index + match[0].length);
+
+    if (!/(?:[=!]==?|\+)\s*$/.test(before) && !/^\s*(?:[=!]==?|\+)/.test(after)) {
+      keys.push(match.groups.key);
+    }
+  }
+
+  return keys;
+}
+
+/*
+ * The first argument of the call whose parenthesis `start` follows: up to the comma that ends it,
+ * nested calls and their commas included, so a key chosen inside one is part of it.
+ */
 function keyArgument(source, start) {
   let depth = 0;
 
@@ -373,23 +459,21 @@ function sourceFiles(dir) {
  * own keys are the language tags the block is organized by.
  *
  * Comments and strings are stepped over where they are met rather than stripped beforehand: a URL
- * inside a message does not start a comment, and a brace or a colon inside one is not structure. A
- * key is the token a property opens with, quoted or not, so the prose after it cannot name one.
+ * inside a message does not start a comment, and a brace or a colon inside one is not structure.
+ * The call itself is found the same way, so a comment that writes it out is not taken for it.
+ *
+ * A key is the token a property opens with, quoted or not, so the prose after it cannot name one.
  */
 function customTranslationKeys() {
   const source = readFileSync(join(UI_DIR, "src", "i18n.ts"), "utf8");
-  const start = source.indexOf("withCustomTranslations(");
-
-  if (start === -1) {
-    throw new Error("No withCustomTranslations call in src/i18n.ts");
-  }
-
   const keys = [];
+
+  let found = false;
   let depth = 0;
   let opens = false;
   let token;
 
-  for (let i = source.indexOf("{", start); i < source.length; ) {
+  for (let i = 0; i < source.length; ) {
     const character = source[i];
 
     if (character === "/" && (source[i + 1] === "/" || source[i + 1] === "*")) {
@@ -405,7 +489,7 @@ function customTranslationKeys() {
       continue;
     }
 
-    if (/[\w.-]/.test(character)) {
+    if (/\w/.test(character)) {
       const end = tokenEnd(source, i);
 
       token = source.slice(i, end);
@@ -413,13 +497,16 @@ function customTranslationKeys() {
       continue;
     }
 
-    if (character === "{") {
-      depth++;
+    if (character === "(") {
+      found = found || token === "withCustomTranslations";
+    } else if (character === "{") {
+      if (found) {
+        depth++;
+      }
+
       opens = true;
     } else if (character === "}") {
-      depth--;
-
-      if (depth === 0) {
+      if (depth > 0 && --depth === 0) {
         break;
       }
 
@@ -434,8 +521,16 @@ function customTranslationKeys() {
       opens = false;
     }
 
-    token = undefined;
+    /* Whitespace does not end a property name: `alpha : "A"` and a colon on its own line name alpha. */
+    if (!/\s/.test(character)) {
+      token = undefined;
+    }
+
     i++;
+  }
+
+  if (!found) {
+    throw new Error("No withCustomTranslations call in src/i18n.ts");
   }
 
   return keys;
@@ -467,7 +562,7 @@ function stringEnd(source, i) {
 function tokenEnd(source, i) {
   let end = i;
 
-  while (end < source.length && /[\w.-]/.test(source[end])) {
+  while (end < source.length && /\w/.test(source[end])) {
     end++;
   }
 
@@ -479,7 +574,10 @@ const root = await themesRoot(version);
 
 for (const theme of THEMES) {
   if (!existsSync(loginDir(root, theme))) {
-    throw new Error(`Keycloak ${version} ships no "${theme}" login theme. Check \`loginParentTheme\` in theme/build.gradle.`);
+    throw new Error(
+      `Keycloak ${version} ships no "${theme}" login theme. Check \`loginParentTheme\` in ` +
+        "theme/build.gradle, or ORG_GRADLE_PROJECT_loginParentTheme in the environment."
+    );
   }
 }
 
@@ -491,7 +589,7 @@ const ourKeys = customTranslationKeys();
 const keycloakifyMessages = (await import("keycloakify/login/i18n/messages_defaultSet/en.js")).default;
 
 /* Keycloak's own versions of the pages we implement, and every macro behind them. */
-const counterparts = inThemes(pages).filter(name => templateText(root, name) !== undefined);
+const counterparts = asServed(root, pages);
 const upstreamKeys = templateMessageKeys(root, withImports(root, counterparts));
 
 const problems = [];
@@ -586,9 +684,14 @@ if (before === undefined) {
 
 const previousRoot = await themesRoot(before);
 
-/* Both versions, so a template imported in only one of them is still watched. */
-const ours = inThemes([...pages, ...SHARED_TEMPLATES]);
-const watched = [...new Set([...withImports(root, ours), ...withImports(previousRoot, ours)])].sort();
+/* Both versions, so a template imported in only one of them, or moved between themes, is watched. */
+const ours = [...pages, ...SHARED_TEMPLATES];
+const watched = [
+  ...new Set([
+    ...withImports(root, asServed(root, ours)),
+    ...withImports(previousRoot, asServed(previousRoot, ours))
+  ])
+].sort();
 
 const changed = watched.filter(name => {
   const now = templateText(root, name);
@@ -620,6 +723,13 @@ const reworded = requested
   .filter(key => messages.has(key) && messagesBefore.has(key) && messages.get(key) !== messagesBefore.get(key))
   .sort();
 
+/*
+ * A stand-in of ours Keycloak has started defining, so ours is English over a string it now
+ * translates. Not a failure: Keycloakify's bundle is what resolves a key in the browser, and until
+ * it ships this one, ours is the only thing that renders. The check above fails when it does.
+ */
+const nowUpstream = ourKeys.filter(key => messages.has(key) && !messagesBefore.has(key)).sort();
+
 /* The release notes cover far more than templates and keys, and both URLs come from the version. */
 const lines = [
   `## Keycloak ${before} to ${version}`,
@@ -646,6 +756,7 @@ if (startedUsing.length > 0) {
 const sections = [
   ["Keycloak changed these behind our pages", changed.map(name => `- \`${name}\`\n  \`diff -u .keycloak-cache/{${before},${version}}/theme/${name.replace("/", "/login/")}\``)],
   ["Reworded upstream, and we render it", reworded.map(key => `- \`${key}\`\n  was: ${messagesBefore.get(key)}\n  now: ${messages.get(key)}`)],
+  ["Defined upstream now, and src/i18n.ts stands in for it", nowUpstream.map(key => `- \`${key}\`: ${messages.get(key)}`)],
   ["New pages upstream", addedPages.map(name => `- \`${name}\``)],
   ["New macros behind our pages", addedMacros.map(name => `- \`${name}\``)],
   ["Gone upstream", removed.map(name => `- \`${name}\``)]
@@ -672,7 +783,8 @@ if (process.env.GITHUB_ACTIONS === "true") {
   const annotations = [
     ...startedUsing.map(key => ["error", `Keycloak labels a control with "${key}", our theme does not`]),
     ...changed.map(name => ["warning", `${name} changed behind one of our pages`]),
-    ...reworded.map(key => ["warning", `"${key}" is reworded upstream, and we render it`])
+    ...reworded.map(key => ["warning", `"${key}" is reworded upstream, and we render it`]),
+    ...nowUpstream.map(key => ["warning", `Keycloak defines "${key}" now, which src/i18n.ts stands in for`])
   ];
 
   for (const [level, text] of annotations) {

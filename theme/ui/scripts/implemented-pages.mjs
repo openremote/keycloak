@@ -17,8 +17,11 @@ import { fileURLToPath } from "node:url";
 /* Beside this file rather than below the working directory, so either script can run from anywhere. */
 const PAGES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "src", "pages");
 
-/* `export const pageId = "login.ftl";` */
-const DECLARATION = /export const pageId\s*=\s*"([^"]+)"/;
+/* `export const pageId = "login.ftl";`, with or without a type annotation, either quote. */
+const DECLARATION = /export const pageId\s*(?::[^=\n]+)?=\s*["']([^"']+)["']/;
+
+/* A page declares one, so a file that declares one this cannot read is an error rather than a skip. */
+const DECLARES = /\bexport\s+const\s+pageId\b/;
 
 /** Every page id declared in src/pages, sorted. */
 export function implementedPages() {
@@ -29,10 +32,21 @@ export function implementedPages() {
       continue;
     }
 
-    const match = DECLARATION.exec(readFileSync(join(PAGES_DIR, basename), "utf8"));
+    const source = readFileSync(join(PAGES_DIR, basename), "utf8");
+    const match = DECLARATION.exec(source);
 
     if (match !== null) {
       pages.add(match[1]);
+      continue;
+    }
+
+    /*
+     * src/page-registry.ts reads the exported value rather than the source, so a page whose
+     * declaration this cannot read renders in the dev server while its template is left out of the
+     * jar, and Keycloak serves its own page instead. Silence is the one answer that will not do.
+     */
+    if (DECLARES.test(source)) {
+      throw new Error(`src/pages/${basename} declares a pageId that ${DECLARATION} cannot read.`);
     }
   }
 

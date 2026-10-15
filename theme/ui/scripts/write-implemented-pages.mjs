@@ -14,10 +14,17 @@
  * Keycloak check has to answer from the same list.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { implementedPages } from "./implemented-pages.mjs";
 
-const OUTPUT_FILE = join("build_keycloak", "implemented-pages.txt");
+/* Where theme/build.gradle reads it, rather than below the working directory. */
+const OUTPUT_FILE = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "build_keycloak",
+  "implemented-pages.txt"
+);
 
 /*
  * Keycloakify also writes these aliases, under the names Keycloak used before the user

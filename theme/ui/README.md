@@ -79,7 +79,7 @@ Everything dev-only lives in `src/dev/`, reached solely through a dynamic import
 
 Most of what this theme depends on lives in Keycloak rather than here: the message key behind every control, the fields a page is handed, which pages exist at all. None of that is checked by compiling, so an upgrade can rename a key or drop a page and everything still builds.
 
-`yarn check-keycloak` is the check that notices, and it is run by `.github/workflows/keycloak-drift.yml` on pushes to `main` and on every pull request that touches `src/`, the `Dockerfile`, the script or the workflow. It keeps no record of its own: a Keycloak version's templates never change, so the published jar for each version is the record, and the `Dockerfile` and git history say which versions those are.
+`yarn check-keycloak` is the check that notices, and it is run by `.github/workflows/keycloak-drift.yml` on pushes to `main` and on every pull request that touches what it reads: `src/`, the `Dockerfile`, `theme/build.gradle`, either of the two scripts behind it, `package.json`, `yarn.lock` or the workflow itself. It keeps no record of its own: a Keycloak version's templates never change, so the published jar for each version is the record, and the `Dockerfile` and git history say which versions those are.
 
 **Four things it fails on**, each true or false against the version `ARG VERSION` pins:
 
@@ -90,17 +90,19 @@ Most of what this theme depends on lives in Keycloak rather than here: the messa
 | No stand-in in `src/i18n.ts` is redundant | Keycloakify now ships a key we were carrying ourselves, so ours can go and every locale gets Keycloak's own translation |
 | No key the script records as never defined upstream is defined now | Keycloak added a message for something we were standing in for, so the exception can go |
 
-**Five things it reports**, when the branch moves the pinned version: the templates behind our pages that changed, with a diff command each; pages added or removed upstream; new macros that a template behind one of our pages imports; message keys Keycloak's own version of our pages has started naming that our theme does not, which is how a relabelled control shows up while the key we still name goes on resolving; and keys we name whose English text changed, since the same key can carry different wording or a parameter it did not have.
+**Six things it reports**, when the branch moves the pinned version: the templates behind our pages that changed, with a diff command each; pages added or removed upstream; new macros that a template behind one of our pages imports; message keys Keycloak's own version of our pages has started naming that our theme does not, which is how a relabelled control shows up while the key we still name goes on resolving; keys we name whose English text changed, since the same key can carry different wording or a parameter it did not have; and keys `src/i18n.ts` stands in for that Keycloak has started defining, where our English now sits over a string it translates in every language.
 
-One of the five fails, under **Failure: Drift detected**: a key Keycloak's own version of one of our pages has started naming that our theme does not. That is a control it relabelled, and our page is the thing to change, so it uses Keycloak's key for it. Where ours is deliberately worded otherwise, the key goes in `UPSTREAM_ONLY` in the check, with the reason in a comment beside it.
+One of the six fails, under **Failure: Drift detected**: a key Keycloak's own version of one of our pages has started naming that our theme does not. That is a control it relabelled, and our page is the thing to change, so it uses Keycloak's key for it. Where ours is deliberately worded otherwise, the key goes in `UPSTREAM_ONLY` in the check, with the reason in a comment beside it.
 
 The rest is listed under **Consider checking** and does not fail: there is nothing here to edit to settle whether a template that moved, or wording Keycloak rewrote, matters to our version of a page, so a failure would be a red that no change can clear. Each line is a warning annotation on the run, and the report heads with Keycloak's release notes and upgrading guide for the new version.
 
-Three further failures are about the check rather than the theme. It reads upstream markup with regexes, and one that stops matching makes an upgrade look clean, so each has to prove it still finds something in Keycloak's own versions of our pages.
+Four further failures are about the check rather than the theme. It reads upstream markup with regexes, and one that stops matching makes an upgrade look clean, so each has to prove it still finds something in Keycloak's own versions of our pages. The one about button labels asks only of the pages that render a button through Keycloak's macro, since the older parent theme has no pages of its own at all.
 
 What it watches is our pages' upstream counterparts closed over `<#import>`, not just the page files: 26.8.0 redesigned the identity provider buttons inside `social-providers.ftl` and left `login.ftl` untouched, which the page files alone would have reported as no change at all.
 
-It needs `unzip` or a JDK, and downloads Keycloak's themes jar once per version into `.keycloak-cache/`.
+It needs `unzip` or a JDK, and downloads Keycloak's themes jar once per version into `.keycloak-cache/`, checked against the checksum Maven Central publishes beside it.
+
+Which of Keycloak's own themes our pages are compared against is the one they would fall through to: `loginParentTheme` from `theme/build.gradle`, which is `keycloak.v2` unless the build is given another, plus `base` for every file that theme does not override. To check against a different one, set `ORG_GRADLE_PROJECT_loginParentTheme`, the environment variable Gradle also reads for that property. A `-PloginParentTheme` on a Gradle command line is not visible to the check.
 
 ### What it does not cover
 
@@ -113,7 +115,8 @@ The Vaadin components and the design system have their own versions and their ow
 - **`i18n.ts carries "x" only because ...`** — delete that entry from `withCustomTranslations`.
 - **`### Failure: Drift detected`** in the upgrade report: Keycloak relabelled a control we also have. Use its key on our page, or add the key to `UPSTREAM_ONLY` with the reason beside it.
 - **`UPSTREAM_ONLY lists "x" ...`**: that entry has outlived itself, because Keycloak does not name the key behind any page we implement, or because this theme names it now. Drop it, or check the spelling.
-- **`No <#import> resolves ...`**, **`No page of Keycloak's renders registrationLayout ...`** or **`No msg("...") resolves ...`**: the check's own reading of Keycloak's templates has stopped working, so the upgrade report would be quietly incomplete. Fix the named function; do not silence the check.
+- **`No <#import> resolves ...`**, **`No page of Keycloak's renders registrationLayout ...`**, **`No msg("...") resolves ...`** or **`No label resolves ...`**: the check's own reading of Keycloak's templates has stopped working, so the upgrade report would be quietly incomplete. Fix the named function; do not silence the check.
+- **`Keycloak <version> ships no "x" login theme`** — the parent theme the pages we do not implement fall through to is not in Keycloak's jar, so there is nothing to compare ours against. Check `loginParentTheme`, in `theme/build.gradle` or in the environment.
 
 ### When you bump Keycloak
 

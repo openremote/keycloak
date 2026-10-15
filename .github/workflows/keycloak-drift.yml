@@ -52,6 +52,7 @@ jobs:
   check:
     name: Keycloak check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -69,7 +70,7 @@ jobs:
       # stand-ins in src/i18n.ts are still needed.
       - name: Install dependencies
         working-directory: theme/ui
-        run: node .yarn/releases/yarn-4.17.1.cjs install --immutable
+        run: node .yarn/releases/yarn-*.cjs install --immutable
 
       # On a branch that moves the pinned version this also reports what changed upstream, and
       # fails when Keycloak has relabelled a control on a page this theme implements.
