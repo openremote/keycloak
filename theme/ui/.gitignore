@@ -2,6 +2,8 @@ node_modules/
 dist/
 build_keycloak/
 src/kc.gen.tsx
+# Keycloak's own themes and the renderer's jars, downloaded by `./gradlew installDist`.
+.keycloak/
 
 # Keycloak's themes jar and its contents, downloaded by `yarn check-keycloak`.
 .keycloak-cache/

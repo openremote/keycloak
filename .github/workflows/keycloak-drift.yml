@@ -21,6 +21,8 @@ on:
       # The check reads keycloakify's bundled message set, so an upgrade of it changes the answer.
       - 'theme/ui/package.json'
       - 'theme/ui/yarn.lock'
+      - 'theme/ui/dev-server/**'
+      - 'theme/build.gradle'
 
   pull_request:
     paths:
@@ -30,6 +32,8 @@ on:
       - '.github/workflows/keycloak-drift.yml'
       - 'theme/ui/package.json'
       - 'theme/ui/yarn.lock'
+      - 'theme/ui/dev-server/**'
+      - 'theme/build.gradle'
 
   workflow_dispatch:
 
@@ -68,3 +72,30 @@ jobs:
       - name: Check against Keycloak
         working-directory: theme/ui
         run: node scripts/check-keycloak-drift.mjs
+
+  # The image build skips downloadStockKeycloak so a release cannot fail on Maven Central being
+  # unreachable, which leaves nothing exercising the download or the renderer behind the dev
+  # server's stock pages. This job is that, and it belongs here for the same reason: this
+  # workflow is already the one allowed to depend on Maven Central.
+  stock-renderer:
+    name: Dev server stock renderer
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21 and gradle cache
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Download Keycloak's themes
+        run: ./gradlew downloadStockKeycloak
+
+      # Covered nowhere else: the image build skips the download this needs. The script is
+      # runnable by hand as well, which is the point of it being a script.
+      - name: Render a stock page
+        run: theme/ui/dev-server/check-stock-renderer.sh
