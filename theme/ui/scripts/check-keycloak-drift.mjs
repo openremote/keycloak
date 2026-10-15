@@ -476,6 +476,16 @@ function customTranslationKeys() {
   return keys;
 }
 
+/** The installed Keycloakify's version, and its KcContext types, which name every page it has. */
+function installedKeycloakify() {
+  const root = dirname(fileURLToPath(import.meta.resolve("keycloakify/package.json")));
+
+  return {
+    version: JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version,
+    types: readFileSync(join(root, "login", "KcContext", "KcContext.d.ts"), "utf8")
+  };
+}
+
 const version = pinnedVersion(readFileSync(join(REPO_ROOT, "Dockerfile"), "utf8"));
 const root = await themesRoot(version);
 
@@ -614,6 +624,17 @@ const addedPages = appeared.filter(name => isPage(root, name));
 const addedMacros = appeared.filter(name => !isPage(root, name) && watched.includes(name));
 
 /*
+ * New pages the installed Keycloakify has no mock or type for. The dev server lists Keycloakify's
+ * pages and ours are written against its types, so neither has one of these until Keycloakify is
+ * updated. Within its major it only adds, and package.json already allows any release of it.
+ */
+const keycloakify = installedKeycloakify();
+const notInKeycloakify = [...new Set(addedPages.map(name => name.split("/")[1]))].filter(
+  page => !keycloakify.types.includes(`"${page}"`)
+);
+const keycloakifyMajor = keycloakify.version.split(".")[0];
+
+/*
  * A control Keycloak relabelled: its own version of one of our pages names a key our theme does not.
  * Nothing above sees this, because the key we still name goes on resolving. 26.8.0 moved the
  * identity provider buttons from `identity-provider-login-label` to `signInWithProvider` this way.
@@ -665,6 +686,11 @@ const sections = [
   ["Reworded upstream, and we render it", reworded.map(key => `- \`${key}\`\n  was: ${messagesBefore.get(key)}\n  now: ${messages.get(key)}`)],
   ["Defined upstream now, and src/i18n.ts stands in for it", nowUpstream.map(key => `- \`${key}\`: ${messages.get(key)}`)],
   ["New pages upstream", addedPages.map(name => `- \`${name}\``)],
+  [
+    `New pages Keycloakify ${keycloakify.version} does not have. Update it to its latest ${keycloakifyMajor}.x release and ` +
+      "check they show up in the dev server; if they do not, no release has them yet",
+    notInKeycloakify.map(page => `- \`${page}\``)
+  ],
   ["New macros behind our pages", addedMacros.map(name => `- \`${name}\``)],
   ["Gone upstream", removed.map(name => `- \`${name}\``)]
 ].filter(([, items]) => items.length > 0);
@@ -691,7 +717,8 @@ if (process.env.GITHUB_ACTIONS === "true") {
     ...startedUsing.map(key => ["error", `Keycloak labels a control with "${key}", our theme does not`]),
     ...changed.map(name => ["warning", `${name} changed behind one of our pages`]),
     ...reworded.map(key => ["warning", `"${key}" is reworded upstream, and we render it`]),
-    ...nowUpstream.map(key => ["warning", `Keycloak defines "${key}" now, which src/i18n.ts stands in for`])
+    ...nowUpstream.map(key => ["warning", `Keycloak defines "${key}" now, which src/i18n.ts stands in for`]),
+    ...notInKeycloakify.map(page => ["warning", `${page} is new upstream, and Keycloakify ${keycloakify.version} does not have it`])
   ];
 
   for (const [level, text] of annotations) {
