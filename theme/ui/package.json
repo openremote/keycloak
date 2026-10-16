@@ -9,6 +9,7 @@
     "build": "rspack build",
     "prebuild-keycloak-theme": "keycloakify update-kc-gen",
     "typecheck": "tsc",
+    "check-keycloak": "node scripts/check-keycloak-drift.mjs",
     "build-keycloak-theme": "tsc && rspack build && keycloakify build && node scripts/write-implemented-pages.mjs"
   },
   "keycloakify": {
