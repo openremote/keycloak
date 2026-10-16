@@ -263,8 +263,8 @@ function templateText(root, name) {
  * from, so base/error.ftl imports keycloak.v2's template.ftl. Names that do not exist are dropped,
  * and only the literal import form is read, which is the only one Keycloak's own templates use.
  *
- * The page files alone were not enough: 26.8.0 redesigned the identity provider buttons inside
- * social-providers.ftl and left the login.ftl that imports it untouched.
+ * The page files alone are not enough: much of what a page renders lives in a macro it imports,
+ * which can change while the page file does not.
  */
 function withImports(root, names) {
   const seen = new Set();
@@ -301,7 +301,7 @@ function isPage(root, name) {
  *
  *   - `msg("doSubmit")`, and `msg('showPassword')`, which field.ftl and the base pages prefer.
  *   - `msg(useGrid?then("identity-provider-login-label-divider", "orLabel"))`, where FreeMarker
- *     picks between two keys, as 26.8.0's social-providers.ftl does.
+ *     picks between two keys.
  *   - `<@buttons.button label="doSubmit"/>`, where the macro resolves it: `${msg(label)}`. That is
  *     how the buttons on most of the pages we implement are written.
  *
@@ -662,8 +662,7 @@ const keycloakifyMajor = keycloakify.version.split(".")[0];
 
 /*
  * A control Keycloak relabelled: its own version of one of our pages names a key our theme does not.
- * Nothing above sees this, because the key we still name goes on resolving. 26.8.0 moved the
- * identity provider buttons from `identity-provider-login-label` to `signInWithProvider` this way.
+ * Nothing above sees this, because the key we still name goes on resolving.
  */
 const named = new Set([...requested, ...ourKeys]);
 const upstreamBefore = templateMessageKeys(previousRoot, watched);

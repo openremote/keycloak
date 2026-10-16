@@ -98,7 +98,7 @@ The rest is listed under **Consider checking** and does not fail: there is nothi
 
 Four further failures are about the check rather than the theme. It reads upstream markup with regexes, and one that stops matching makes an upgrade look clean, so each has to prove it still finds something in Keycloak's own versions of our pages. The one about button labels asks only of the pages that render a button through Keycloak's macro, since the older parent theme has no pages of its own at all.
 
-What it watches is our pages' upstream counterparts closed over `<#import>`, not just the page files: 26.8.0 redesigned the identity provider buttons inside `social-providers.ftl` and left `login.ftl` untouched, which the page files alone would have reported as no change at all.
+What it watches is our pages' upstream counterparts closed over `<#import>`, not just the page files: much of what a page renders lives in a macro it imports, which can change while the page file does not.
 
 It needs `unzip` or a JDK, and downloads Keycloak's themes jar once per version into `.keycloak-cache/`, checked against the checksum Maven Central publishes beside it.
 
