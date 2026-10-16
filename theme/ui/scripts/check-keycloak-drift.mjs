@@ -26,8 +26,11 @@ const CACHE_DIR = join(UI_DIR, ".keycloak-cache");
 /* Maven Central, or the job would sit on a stalled read until CI's own limit cut it off. */
 const DOWNLOAD_TIMEOUT_MS = 60_000;
 
-/* Where the lists below live, so a failure cleared by editing one says where to go. */
-const SCRIPT = relative(REPO_ROOT, fileURLToPath(import.meta.url));
+/*
+ * Where the lists below live, so a failure cleared by editing one says where to go. With `/` on
+ * Windows too, like every other path the report prints.
+ */
+const SCRIPT = relative(REPO_ROOT, fileURLToPath(import.meta.url)).replaceAll("\\", "/");
 
 /* The theme unimplemented pages fall through to, and base, which every theme is built on. */
 const THEMES = ["base", parentTheme()];
@@ -696,7 +699,7 @@ if (startedUsing.length > 0) {
     "",
     "### Failure: Drift detected",
     "",
-    "Keycloak relabelled a control our pages also have. Use its key on our page, or record why ours differ in \`UPSTREAM_ONLY\`.",
+    "Keycloak relabelled a control our pages also have. Use its key on our page, or record why ours differ in `UPSTREAM_ONLY`.",
     "",
     `See \`${SCRIPT}\`.`,
     "",
