@@ -618,8 +618,23 @@ const changed = watched.filter(name => {
 });
 
 const previousNames = new Set(templateNames(previousRoot));
-const appeared = [...names].filter(name => !previousNames.has(name)).sort();
-const removed = [...previousNames].filter(name => !names.has(name)).sort();
+
+/*
+ * Files Keycloak serves from another theme now: the parent theme started overriding one base
+ * served, or stopped. Neither is new or gone, since the file was served throughout, so each is
+ * compared across the move instead.
+ */
+const basenames = new Set([...previousNames, ...names].map(name => name.split("/")[1]));
+const moved = [...basenames].sort().flatMap(basename => {
+  const [then] = asServed(previousRoot, [basename]);
+  const [now] = asServed(root, [basename]);
+
+  return then !== undefined && now !== undefined && then !== now ? [{ then, now }] : [];
+});
+const behindOurPages = ({ then, now }) => watched.includes(then) || watched.includes(now);
+
+const appeared = [...names].filter(name => !previousNames.has(name) && !moved.some(({ now }) => now === name)).sort();
+const removed = [...previousNames].filter(name => !names.has(name) && !moved.some(({ then }) => then === name)).sort();
 const addedPages = appeared.filter(name => isPage(root, name));
 const addedMacros = appeared.filter(name => !isPage(root, name) && watched.includes(name));
 
@@ -685,6 +700,15 @@ const sections = [
   ["Keycloak changed these behind our pages", changed.map(name => `- \`${name}\`\n  \`diff -u .keycloak-cache/{${before},${version}}/theme/${name.replace("/", "/login/")}\``)],
   ["Reworded upstream, and we render it", reworded.map(key => `- \`${key}\`\n  was: ${messagesBefore.get(key)}\n  now: ${messages.get(key)}`)],
   ["Defined upstream now, and src/i18n.ts stands in for it", nowUpstream.map(key => `- \`${key}\`: ${messages.get(key)}`)],
+  [
+    "Served from another theme now",
+    moved.map(move => {
+      const path = (at, name) => `.keycloak-cache/${at}/theme/${name.replace("/", "/login/")}`;
+      const ours = behindOurPages(move) ? ", behind our pages" : "";
+
+      return `- \`${move.then}\` to \`${move.now}\`${ours}\n  \`diff -u ${path(before, move.then)} ${path(version, move.now)}\``;
+    })
+  ],
   ["New pages upstream", addedPages.map(name => `- \`${name}\``)],
   [
     `New pages Keycloakify ${keycloakify.version} does not have. Update it to its latest ${keycloakifyMajor}.x release and ` +
@@ -716,6 +740,7 @@ if (process.env.GITHUB_ACTIONS === "true") {
   const annotations = [
     ...startedUsing.map(key => ["error", `Keycloak labels a control with "${key}", our theme does not`]),
     ...changed.map(name => ["warning", `${name} changed behind one of our pages`]),
+    ...moved.filter(behindOurPages).map(({ then, now }) => ["warning", `${now} replaces ${then} behind one of our pages`]),
     ...reworded.map(key => ["warning", `"${key}" is reworded upstream, and we render it`]),
     ...nowUpstream.map(key => ["warning", `Keycloak defines "${key}" now, which src/i18n.ts stands in for`]),
     ...notInKeycloakify.map(page => ["warning", `${page} is new upstream, and Keycloakify ${keycloakify.version} does not have it`])
