@@ -205,9 +205,9 @@ function loginDir(root, theme) {
   return join(root, "theme", theme, "login");
 }
 
-/** Keycloak's English bundle, which is also what an extraction is judged complete by. */
-function messagesFile(root) {
-  return join(loginDir(root, "base"), "messages", "messages_en.properties");
+/** A theme's English bundle. base's is also what an extraction is judged complete by. */
+function messagesFile(root, theme = "base") {
+  return join(loginDir(root, theme), "messages", "messages_en.properties");
 }
 
 /*
@@ -330,20 +330,28 @@ function templateMessageKeys(root, names) {
 }
 
 /*
- * Keycloak's own English bundle, as key to text. The keys are what the checks are about; the text
- * is read only to notice that one changed under a key this theme names. A value continued onto
- * another line with a backslash is read as its first line, which can hide such a change but
- * cannot invent one.
+ * Keycloak's own English messages, as key to text: base's bundle with the parent theme's over it,
+ * which is how Keycloak resolves them, a theme's own messages taking precedence over those it
+ * inherits. The keys are what the checks are about; the text is read only to notice that one
+ * changed under a key this theme names. A value continued onto another line with a backslash is
+ * read as its first line, which can hide such a change but cannot invent one.
  */
 function keycloakMessages(root) {
-  const properties = readFileSync(messagesFile(root), "utf8");
   const messages = new Map();
 
-  for (const line of properties.split("\n")) {
-    const match = /^([^#=\s]+)=(.*)$/.exec(line);
+  for (const theme of THEMES) {
+    const file = messagesFile(root, theme);
 
-    if (match !== null) {
-      messages.set(match[1], match[2].trim());
+    if (!existsSync(file)) {
+      continue;
+    }
+
+    for (const line of readFileSync(file, "utf8").split("\n")) {
+      const match = /^([^#=\s]+)=(.*)$/.exec(line);
+
+      if (match !== null) {
+        messages.set(match[1], match[2].trim());
+      }
     }
   }
 
