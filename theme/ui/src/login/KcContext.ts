@@ -61,6 +61,11 @@ export type KcContextExtensionPerPage = {
   };
   "login-idp-link-email.ftl": { idpDisplayName?: string };
   /**
+   * The address the verification mail went to, set once it has been sent. Keycloak's own
+   * template chooses its wording by it, and Keycloakify does not model it.
+   */
+  "login-verify-email.ftl": { verifyEmail?: string };
+  /**
    * Sent only when tracing is enabled on the server. Keycloak's own error.ftl prints it as
    * the identifier to quote to support, and Keycloakify does not model it.
    */

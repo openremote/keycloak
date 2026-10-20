@@ -125,6 +125,16 @@ export function runDevMode(root: HTMLElement): void {
       (kcContext as { isAppInitiatedAction?: boolean }).isAppInitiatedAction = true;
     }
 
+    /*
+     * Keycloakify mocks login-verify-email before the mail has gone out, which a user only meets
+     * when an application asked for the action. The usual way onto the page is the required
+     * action, which has sent it, and Keycloak then names the address it went to.
+     */
+    if (pageId === "login-verify-email.ftl") {
+      const verify = kcContext as { verifyEmail?: string; user?: { email: string } };
+      verify.verifyEmail = verify.user?.email;
+    }
+
     renderPage(kcContext, root);
     /*
      * No manager here, and nothing in the harness can point one at the dev server, so there is

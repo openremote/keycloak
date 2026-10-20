@@ -54,6 +54,15 @@ const { getI18n: getI18n_base, ofTypeI18n } = i18nBuilder
        */
       traceIdSupportMessage:
         "If you contact support, please provide the following trace identifier: {0}",
+      /*
+       * Keycloak's own strings as well (26.7 messages_en.properties lines 175 to 177), for the
+       * same reason: the verify-email page Keycloak shows an application-initiated action
+       * names them, and Keycloakify's bundled message set predates them.
+       */
+      emailVerifyInstruction4:
+        "To verify your email address, we are about to send you email with instructions to the address {0}.",
+      emailVerifyResend: "Re-send verification email",
+      emailVerifySend: "Send verification email",
       // Fallback label for an OTP credential the user saved without naming it. Keycloak's own
       // template renders the blank label as-is, giving a radio with no accessible name.
       otpDeviceFallback: "Device {0}"
