@@ -71,7 +71,8 @@ jobs:
       - name: Install dependencies
         working-directory: theme/ui
         # The release .yarnrc.yml names: a glob would pass a second one to the first as an argument.
-        run: node "$(sed -n 's/^yarnPath: *//p' .yarnrc.yml)" install --immutable
+        run: |
+          node "$(sed -n 's/^yarnPath: *//p' .yarnrc.yml)" install --immutable
 
       # On a branch that moves the pinned version this also reports what changed upstream, and
       # fails when Keycloak has relabelled a control on a page this theme implements.

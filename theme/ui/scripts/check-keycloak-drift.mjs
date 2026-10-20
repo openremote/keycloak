@@ -621,12 +621,18 @@ const watched = [
   ])
 ].sort();
 
-const changed = watched.filter(name => {
-  const now = templateText(root, name);
-  const then = templateText(previousRoot, name);
+/*
+ * The watched templates a version serves. Around a move between themes, one version has a copy it
+ * serves to nobody: base's after the parent theme takes a page over, or before it gives one back.
+ * That copy's edits and keys are not drift, and the move is compared across instead.
+ */
+const servedIn = at => watched.filter(name => asServed(at, [name.split("/")[1]])[0] === name);
+const servedNow = servedIn(root);
+const servedThen = servedIn(previousRoot);
 
-  return now !== undefined && then !== undefined && now !== then;
-});
+const changed = servedNow.filter(
+  name => servedThen.includes(name) && templateText(root, name) !== templateText(previousRoot, name)
+);
 
 const previousNames = new Set(templateNames(previousRoot));
 
@@ -665,8 +671,8 @@ const keycloakifyMajor = keycloakify.version.split(".")[0];
  * Nothing above sees this, because the key we still name goes on resolving.
  */
 const named = new Set([...requested, ...ourKeys]);
-const upstreamBefore = templateMessageKeys(previousRoot, watched);
-const startedUsing = [...templateMessageKeys(root, watched)]
+const upstreamBefore = templateMessageKeys(previousRoot, servedThen);
+const startedUsing = [...templateMessageKeys(root, servedNow)]
   .filter(key => !upstreamBefore.has(key) && !named.has(key) && !UPSTREAM_ONLY.has(key))
   .sort();
 
