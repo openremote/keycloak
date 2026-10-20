@@ -219,6 +219,15 @@ body {
   text-align: center;
 }
 
+/* Drawn as Lumo draws a rule, a 1px contrast-10pct fill, since Lumo's own hr style is not loaded
+   here. The card's gap spaces it, so none of the browser's margin. */
+.or-divider {
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background-color: var(--or-color-contrast-10pct);
+}
+
 /* --------------------------------------------------------------------------
  * Links
  * ------------------------------------------------------------------------ */
