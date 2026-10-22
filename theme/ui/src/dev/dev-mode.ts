@@ -87,7 +87,7 @@ export function runDevMode(root: HTMLElement): void {
      *
      * The mock does list only two authenticator apps and pre-resolves their names, where
      * Keycloak sends message keys for three. Use the keys, so the preview matches the design
-     * and exercises the lookup in config-totp.ts.
+     * and exercises the lookup in login-config-totp.ts.
      */
     const totp = (kcContext as { totp?: { supportedApplications: string[] } }).totp;
 
