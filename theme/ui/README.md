@@ -55,7 +55,7 @@ removes a page updates the list automatically; and the implemented set comes fro
 
 ## Adding a page
 
-Drop a file in `src/pages` exporting `pageId` and `render`. Nothing else — no router entry, no list to update. The dev nav picks it up, and so does the packaging step, which reads the same declaration to decide which generated templates to keep:
+Drop a file in `src/pages` exporting `pageId` and `render`, and name it after the `pageId` (`login-otp.ts` for `login-otp.ftl`). Nothing else — no router entry, no list to update. The dev nav picks it up, and so does the packaging step, which reads the same declaration to decide which generated templates to keep:
 
 ```ts
 // src/pages/terms.ts

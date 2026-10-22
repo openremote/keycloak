@@ -22,11 +22,11 @@ Work from the link you were given: node ids change when the file is reorganized,
 - Put form state on the component, not the slotted `<input>`. Vaadin manages the slotted input and drops `name`, `value`, `required`, `autocomplete` and `autofocus` from it; only `type`, `inputmode` and `dir` belong there.
 - Where the posted value lives differs per component:
 
-    | component                                | `name` goes on                                       |
-    | ---------------------------------------- | ---------------------------------------------------- |
-    | text, password and email field, checkbox | the host                                             |
-    | text area                                | the slotted `<textarea>`                             |
-    | select, radio group                      | a hidden input kept in sync (see `src/pages/otp.ts`) |
+    | component                                | `name` goes on                                             |
+    | ---------------------------------------- | ---------------------------------------------------------- |
+    | text, password and email field, checkbox | the host                                                   |
+    | text area                                | the slotted `<textarea>`                                   |
+    | select, radio group                      | a hidden input kept in sync (see `src/pages/login-otp.ts`) |
 
 - Vaadin buttons do not take part in forms. Use `submitButton()` and `cancelButton()` from `src/layout.ts`; `cancelButton()` also sets `formnovalidate`, without which required fields block cancelling.
 - Check any form change with `new FormData(form)` in a real browser. A field that posts nothing looks identical on screen.
@@ -35,7 +35,7 @@ Work from the link you were given: node ids change when the file is reorganized,
 
 ## Keycloakify
 
-- A page is a module in `src/pages` exporting `pageId` and `render`. The build keeps only those templates; Keycloak serves every other page from the theme's `parent=`.
+- A page is a module in `src/pages` exporting `pageId` and `render`, named after its `pageId` (`login-otp.ts` for `login-otp.ftl`). The build keeps only those templates; Keycloak serves every other page from the theme's `parent=`.
 - `parent=` defaults to `keycloak.v2` (`theme/build.gradle`, `-PloginParentTheme`). A parent that does not resolve makes Keycloak drop the whole theme rather than degrade, and the value is not env-substituted.
 - `KcContextExtensionPerPage` must be `{}`, not `Record<string, never>`, which collapses every page's context to `never`.
 - Build mocks with `createGetKcContextMock({...})` and take `getKcContextMock` off the result.
@@ -44,8 +44,10 @@ Work from the link you were given: node ids change when the file is reorganized,
 
 ## Keycloak
 
+- The profile-driven pages (register, update-profile, identity-provider review) need Keycloak 26. `locale` arrives as a profile attribute; render it as a hidden input, as Keycloak does.
 - OTP errors are reported under the field `totp`, not `otp`.
 - `userOtpCredentials[].userLabel` may be blank; give the control a fallback name.
+- The identity-brokering pages carry `idpDisplayName`; show that rather than `idpAlias`.
 - Keycloak's QR code has a variable quiet zone, so do not hardcode it (see `.or-qr` in `login.css`).
 - `Unexpected error when authenticating with identity provider` is raised by the server, not the theme: the cause is in the container log.
 
