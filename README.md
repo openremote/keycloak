@@ -243,6 +243,8 @@ OR_CHILD_THEME=/path/to/deployment/keycloak/themes/acme/login yarn start
 
 It serves that theme's `resources/` and applies what `orStyles` names, reloading the page when a stylesheet changes. The pages are rendered from mock data, so this is for styling: packaging, message merging and anything a realm configures still need the container.
 
+`theme/ui/dev-server/example-theme` is a small one to start from, and `yarn start:example` runs the dev server with it.
+
 `orStyles` rather than Keycloak's own `styles=`, because that property is inherited from the fallback theme and is what the pages this theme does not implement are rendered with: reading it would put the fallback theme's stylesheet on these pages, and declaring our own would take it away from theirs.
 
 Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. It cannot override messages: every string in these pages comes from the compiled bundle.

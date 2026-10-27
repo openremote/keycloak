@@ -1,0 +1,38 @@
+/*
+ * What a custom project's stylesheet can do, written against the design system's tokens and the
+ * block classes the pages render, so it follows the realm's brand color and dark mode without
+ * restating either.
+ */
+
+/* A wash of the brand color over the page's own tint, which stays underneath. */
+html {
+  --example-wash: color-mix(in srgb, var(--or-color-primary) 30%, transparent);
+  background-image:
+    linear-gradient(160deg, var(--example-wash), transparent 60%),
+    linear-gradient(var(--or-color-contrast-5pct), var(--or-color-contrast-5pct));
+}
+
+/* The same tint reads far stronger against a dark page. */
+html[theme~="dark"] {
+  --example-wash: var(--or-color-primary-10pct);
+}
+
+.or-card {
+  border-top: 0.25rem solid var(--or-color-primary);
+  box-shadow: var(--lumo-box-shadow-s);
+}
+
+/* Only once the page is shown: it is hidden while the realm's branding loads, and an animation
+   that ran then would be over before anyone saw it. */
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.or-booting) .or-card {
+    animation: example-rise 0.3s ease-out;
+  }
+}
+
+@keyframes example-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}

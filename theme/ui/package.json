@@ -6,6 +6,7 @@
   "description": "OpenRemote Keycloak login theme: Lit + @openremote/or-vaadin-components, bundled with rspack and wrapped into a Keycloak theme by Keycloakify.",
   "scripts": {
     "start": "cross-env NODE_ENV=development rspack serve",
+    "start:example": "cross-env NODE_ENV=development OR_CHILD_THEME=dev-server/example-theme/login rspack serve",
     "build": "rspack build",
     "prebuild-keycloak-theme": "keycloakify update-kc-gen",
     "typecheck": "tsc",
