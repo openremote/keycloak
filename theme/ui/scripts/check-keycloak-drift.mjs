@@ -367,7 +367,9 @@ function keycloakMessages(root) {
  * `msgStr(realm.duplicateEmailsAllowed ? "emailInstructionUsername" : "emailInstruction")`.
  *
  * The key argument alone: what follows it are values interpolated into the message, and a literal
- * among those is not a key. A key assembled at runtime is not a literal and cannot be checked here,
+ * among those is not a key. In any of the three quotes, because `msgStr('doLogIn')` type-checks as
+ * well and no formatter here rewrites it to double quotes. A key assembled at runtime, which
+ * includes a template literal with a `${}` in it, is not a literal and cannot be checked here,
  * which is what advancedMsgStr is for.
  */
 function requestedMessageKeys() {
@@ -379,7 +381,7 @@ function requestedMessageKeys() {
     for (const call of source.matchAll(/\b(?:msgStr|advancedMsgStr)\(/g)) {
       const argument = keyArgument(source, call.index + call[0].length);
 
-      for (const key of keyLiterals(argument, /"(?<key>[^"$]+)"/g)) {
+      for (const key of keyLiterals(argument, /(["'`])(?<key>[^"'`$]+)\1/g)) {
         keys.add(key);
       }
     }
@@ -458,9 +460,7 @@ const TOKEN = /(?<comment>\/\/[^\n]*|\/\*[\s\S]*?\*\/)|(?<quote>["'`])(?<string>
  * cannot name one.
  */
 function customTranslationKeys() {
-  const tokens = [...readFileSync(join(UI_DIR, "src", "i18n.ts"), "utf8").matchAll(TOKEN)].filter(
-    token => token.groups.comment === undefined
-  );
+  const tokens = i18nTokens();
   const start = tokens.findIndex(
     (token, i) => token.groups.word === "withCustomTranslations" && tokens[i + 1]?.[0] === "("
   );
@@ -485,6 +485,38 @@ function customTranslationKeys() {
   }
 
   return keys;
+}
+
+/**
+ * The keys in i18n.ts's DECORATED_LINK_KEYS, whose leading chevron the theme takes off: the strings
+ * from the name to the `]` that closes its array. Reading none is an error, so a reshaped
+ * declaration cannot quietly turn this into an empty list.
+ */
+function decoratedLinkKeys() {
+  const tokens = i18nTokens();
+  const start = tokens.findIndex(
+    (token, i) => token.groups.word === "DECORATED_LINK_KEYS" && tokens[i + 1]?.[0] === "="
+  );
+  const keys = [];
+
+  for (let i = start + 1; start !== -1 && i < tokens.length && tokens[i][0] !== "]"; i++) {
+    if (tokens[i].groups.string !== undefined) {
+      keys.push(tokens[i].groups.string);
+    }
+  }
+
+  if (keys.length === 0) {
+    throw new Error("No DECORATED_LINK_KEYS array of keys in src/i18n.ts");
+  }
+
+  return keys;
+}
+
+/* i18n.ts as tokens, without its comments, which may write code out that is not there. */
+function i18nTokens() {
+  return [...readFileSync(join(UI_DIR, "src", "i18n.ts"), "utf8").matchAll(TOKEN)].filter(
+    token => token.groups.comment === undefined
+  );
 }
 
 /** The installed Keycloakify's version, and its KcContext types, which name every page it has. */
@@ -514,6 +546,7 @@ const names = new Set(templateNames(root));
 const messages = keycloakMessages(root);
 const requested = requestedMessageKeys();
 const ourKeys = customTranslationKeys();
+const decorated = decoratedLinkKeys();
 const keycloakifyMessages = (await import("keycloakify/login/i18n/messages_defaultSet/en.js")).default;
 
 /* Keycloak's own versions of the pages we implement, and every macro behind them. */
@@ -553,6 +586,19 @@ for (const key of ourKeys) {
     problems.push(
       `i18n.ts carries "${key}" only because Keycloakify's message set lacked it. It ships it ` +
         "now, so delete ours and let Keycloak's own translation through."
+    );
+  }
+}
+
+/*
+ * Not only the keys our calls name: an entry no key resolves strips nothing, and one left behind
+ * when Keycloak renamed a link means the page, moved to the new key, shows two chevrons.
+ */
+for (const key of decorated) {
+  if (!messages.has(key) && !ourKeys.includes(key)) {
+    problems.push(
+      `DECORATED_LINK_KEYS in src/i18n.ts lists "${key}", which Keycloak ${version} does not define. ` +
+        "If Keycloak renamed that link, list its new key instead, or the page using it shows two chevrons. Otherwise drop it."
     );
   }
 }
@@ -712,17 +758,20 @@ if (startedUsing.length > 0) {
   );
 }
 
+/* Both paths in full rather than through brace expansion, which only some shells do. */
+const cachePath = (at, name) => `.keycloak-cache/${at}/theme/${name.replace("/", "/login/")}`;
+const diffCommand = (then, now) => `\`diff -u ${cachePath(before, then)} ${cachePath(version, now)}\``;
+
 const sections = [
-  ["Keycloak changed these behind our pages", changed.map(name => `- \`${name}\`\n  \`diff -u .keycloak-cache/{${before},${version}}/theme/${name.replace("/", "/login/")}\``)],
+  ["Keycloak changed these behind our pages", changed.map(name => `- \`${name}\`\n  ${diffCommand(name, name)}`)],
   ["Reworded upstream, and we render it", reworded.map(key => `- \`${key}\`\n  was: ${messagesBefore.get(key)}\n  now: ${messages.get(key)}`)],
   ["Defined upstream now, and src/i18n.ts stands in for it", nowUpstream.map(key => `- \`${key}\`: ${messages.get(key)}`)],
   [
     "Served from another theme now",
     moved.map(move => {
-      const path = (at, name) => `.keycloak-cache/${at}/theme/${name.replace("/", "/login/")}`;
       const ours = behindOurPages(move) ? ", behind our pages" : "";
 
-      return `- \`${move.then}\` to \`${move.now}\`${ours}\n  \`diff -u ${path(before, move.then)} ${path(version, move.now)}\``;
+      return `- \`${move.then}\` to \`${move.now}\`${ours}\n  ${diffCommand(move.then, move.now)}`;
     })
   ],
   ["New pages upstream", addedPages.map(name => `- \`${name}\``)],

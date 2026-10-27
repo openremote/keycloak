@@ -70,12 +70,14 @@ export type I18n = typeof ofTypeI18n;
  *
  * This is not a wording override: the text is Keycloak's in every language, only the glyph the
  * stylesheet is already drawing is taken off.
+ *
+ * The Keycloak check fails on an entry Keycloak does not define, so one left behind when a link is
+ * renamed upstream says so instead of letting the second chevron back in.
  */
 const DECORATED_LINK_KEYS = new Set([
   "backToLogin",
   "backToApplication",
   "backToLoginCredentials",
-  "backToLoginPage",
   "proceedWithAction"
 ]);
 

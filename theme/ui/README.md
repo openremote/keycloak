@@ -71,7 +71,7 @@ Each page narrows `kcContext` to its own variant, so a typo in a `kcContext` fie
 
 Strings come from `i18n.msgStr(key)` using Keycloak's own message keys; OpenRemote's departures from Keycloak's wording are in `src/i18n.ts`. Use `advancedMsgStr` when the key itself comes from `kcContext` — authenticator app names, user profile labels, admin-authored messages.
 
-**To find the key for a control, read Keycloak's own template for that page** and copy the key it passes to `msg(...)`; that is the rule the whole theme follows, so the wording stays Keycloak's in every language. `yarn check-keycloak` leaves those templates in `.keycloak-cache/<version>/theme/base/login/`. A key that does not exist is a compile error, because `msgStr` only accepts Keycloak's own keys.
+**To find the key for a control, read Keycloak's own template for that page** and copy the key it passes to `msg(...)`, or for a button the `label` it passes to the `buttons.button` macro; that is the rule the whole theme follows, so the wording stays Keycloak's in every language. `yarn check-keycloak` leaves those templates in `.keycloak-cache/<version>/theme/<parent theme>/login/`, which is `keycloak.v2` unless the build is given another, and in `.keycloak-cache/<version>/theme/base/login/` for a page the parent theme does not override. A key that is in neither Keycloakify's message set nor `src/i18n.ts` is a compile error, because `msgStr`'s type is built from those. A key Keycloak has since dropped still compiles, which is what `yarn check-keycloak` catches.
 
 Everything dev-only lives in `src/dev/`, reached solely through a dynamic import inside an `if (process.env.NODE_ENV === "development")` branch in `src/main.ts`. That placement is load-bearing: with the import hoisted into a module-level helper merely *called* from the branch, rspack can no longer eliminate it and the page switcher ships to production. Worth re-checking after changes — the production build should emit a single chunk containing neither the nav nor the mocks.
 
@@ -81,14 +81,16 @@ Most of what this theme depends on lives in Keycloak rather than here: the messa
 
 `yarn check-keycloak` is the check that notices, and it is run by `.github/workflows/keycloak-drift.yml` on pushes to `main` and on every pull request that touches what it reads: `src/`, the `Dockerfile`, `theme/build.gradle`, either of the two scripts behind it, `package.json`, `yarn.lock` or the workflow itself. It keeps no record of its own: a Keycloak version's templates never change, so the published jar for each version is the record, and the `Dockerfile` and git history say which versions those are.
 
-**Four things it fails on**, each true or false against the version `ARG VERSION` pins:
+**What it checks about the theme**, each true or false against the version `ARG VERSION` pins, and a failure when false:
 
 | Checked | Means |
 | --- | --- |
 | Every page in `src/pages` still exists upstream | A page we replaced is gone, so ours renders where Keycloak has nothing |
 | Every message key the theme names is defined by Keycloak | The key was dropped or renamed. It still type-checks, because the types come from Keycloakify's copy, but the server resolves nothing |
 | No stand-in in `src/i18n.ts` is redundant | Keycloakify now ships a key we were carrying ourselves, so ours can go and every locale gets Keycloak's own translation |
+| Every key in `DECORATED_LINK_KEYS`, in `src/i18n.ts`, is defined by Keycloak or by a stand-in | Keycloak renamed a link whose chevron we take off, so the page, on the new key, would show two. Or the key never existed, and the entry strips nothing |
 | No key the script records as never defined upstream is defined now | Keycloak added a message for something we were standing in for, so the exception can go |
+| Every key in `UPSTREAM_ONLY` is one Keycloak names behind our pages and our theme does not | The decision it records has nothing left to apply to, so the entry can go |
 
 **Eight things it reports**, when the branch moves the pinned version: the templates behind our pages that changed, with a diff command each; templates Keycloak serves from another theme now, such as a page the parent theme took over from `base`, with a diff command across the move; pages added or removed upstream; new pages the installed Keycloakify does not have; new macros that a template behind one of our pages imports; message keys Keycloak's own version of our pages has started naming that our theme does not, which is how a relabelled control shows up while the key we still name goes on resolving; keys we name whose English text changed, since the same key can carry different wording or a parameter it did not have; and keys `src/i18n.ts` stands in for that Keycloak has started defining, where our English now sits over a string it translates in every language.
 
@@ -113,14 +115,18 @@ The Vaadin components and the design system have their own versions and their ow
 - **`Keycloak <version> has no <page>.ftl`** — our page has no counterpart any more, so it is dead weight in the jar. Remove it, or repoint it at whatever replaced it.
 - **`Message key "x" is not defined by Keycloak <version>`** — find the control in Keycloak's own template for that page and use the key it uses now. If the key never existed upstream and naming it is still right, as with `languages`, which Keycloak's own `template.ftl` names too, add it to `UNDEFINED_UPSTREAM` in the check with the reason.
 - **`i18n.ts carries "x" only because ...`** — delete that entry from `withCustomTranslations`.
+- **`DECORATED_LINK_KEYS in src/i18n.ts lists "x" ...`**: if Keycloak renamed that link, list its new key there instead; otherwise drop the entry.
 - **`### Failure: Drift detected`** in the upgrade report: Keycloak relabelled a control we also have. Use its key on our page, or add the key to `UPSTREAM_ONLY` with the reason beside it.
 - **`UPSTREAM_ONLY lists "x" ...`**: that entry has outlived itself, because Keycloak does not name the key behind any page we implement, or because this theme names it now. Drop it, or check the spelling.
 - **`No <#import> resolves ...`**, **`No page of Keycloak's renders registrationLayout ...`**, **`No msg("...") resolves ...`** or **`No label resolves ...`**: the check's own reading of Keycloak's templates has stopped working, so the upgrade report would be quietly incomplete. Fix the named function; do not silence the check.
 - **`Keycloak <version> ships no "x" login theme`** — the parent theme the pages we do not implement fall through to is not in Keycloak's jar, so there is nothing to compare ours against. Check `loginParentTheme`, in `theme/build.gradle` or in the environment.
+- **`src/pages/<file> declares a pageId that ... cannot read`**: the packaging step reads the declaration the same way, and stops on it too rather than leave the page out of the jar. Write it as a quoted string, `export const pageId = "<page>.ftl";`.
+
+Anything else it stops on is something it needs before it can check at all, and the message says which: the `ARG VERSION=` line or the `loginParentTheme` default it reads the versions from, the declarations it reads in `src/i18n.ts` or `src/pages`, the download, or `unzip` or a JDK.
 
 ### When you bump Keycloak
 
-Change `ARG VERSION` in the `Dockerfile` and run `yarn check-keycloak`. The four checks above run against the new version, and the report is the review list for the upgrade: a control Keycloak relabelled fails it, the rest is for reading. Nothing else in the repo needs the version: the build and this check both read it from there.
+Change `ARG VERSION` in the `Dockerfile` and run `yarn check-keycloak`. The checks above run against the new version, and the report is the review list for the upgrade: a control Keycloak relabelled fails it, the rest is for reading. Nothing else in the repo needs the version: the build and this check both read it from there.
 
 Then look at Keycloakify, which has its own version in `package.json`. The dev server's page list and mock data, the `KcContext` types a page is written against, and the English messages the browser resolves all come from Keycloakify's release, not from Keycloak's, so a page or message the new Keycloak added is missing from all three until Keycloakify ships it. That is why a new page upstream does not show up in the dev server. The report lists every new page the installed Keycloakify does not have; when it lists any, update Keycloakify in the same change to its latest release within the same major, which `package.json` already allows and which only adds to what came before, and check that the pages show up in the dev server. If they do not, no release has them yet. `tsc` catches a type that did change, and the check then says which stand-ins in `src/i18n.ts` can go. A new major is a migration of its own, not part of a Keycloak bump.
 
