@@ -15,7 +15,15 @@ yarn start          # http://localhost:5173
 
 No Keycloak, no container. Page data comes from Keycloakify's `getKcContextMock`, so every page has realistic values, and rspack live-reloads on save.
 
-Live reload covers `src/` only. `rspack.config.mjs` and the modules it imports — everything under `dev-server/` — are read once at startup, so a change there needs the dev server restarted. Nothing there is part of the built theme, so it never needs a Gradle build.
+Point it at a custom project's own theme to work on that one instead:
+
+```shell
+OR_CHILD_THEME=~/acme/deployment/keycloak/themes/acme/login yarn start
+```
+
+It serves that theme's `resources/` under `/__child-theme/` and applies the stylesheets its `theme.properties` names in `orStyles`, reloading the page when one of them changes. The real page has Keycloak write those links into the head; the harness appends them, which puts them in the same place in the cascade.
+
+Live reload covers `src/` only, plus a child theme's `resources/`. `rspack.config.mjs` and the modules it imports — everything under `dev-server/` — are read once at startup, so a change there needs the dev server restarted. Nothing there is part of the built theme, so it never needs a Gradle build.
 
 A menu down the left side lists **every login page** in two sections: the ones with an implementation, then the ones a built theme leaves to Keycloak's own (clicking those renders Keycloak's page from the same mock data). It overlays rather than displacing the page, so the layout you are judging is the real one; below 940px it collapses to a tab at the left edge. It also carries brand color and logo overrides, for checking a custom project's branding without a manager running.
 

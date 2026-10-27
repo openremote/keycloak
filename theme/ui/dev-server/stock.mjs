@@ -46,7 +46,7 @@ const TYPES = {
 };
 
 /** `parent=` and `import=` from a theme.properties, or nothing if the file is not there. */
-function themeProperties(file) {
+export function themeProperties(file) {
   if (!existsSync(file)) {
     return {};
   }

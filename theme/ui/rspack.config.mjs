@@ -1,10 +1,16 @@
 import { CopyRspackPlugin, HtmlRspackPlugin } from "@rspack/core";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { childTheme } from "./dev-server/child-theme.mjs";
 import { stockKeycloak } from "./dev-server/stock.mjs";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === "development";
+
+/* A custom project's own theme, worked on without a container. See dev-server/child-theme.mjs. */
+const child = childTheme({
+  themeDir: process.env.OR_CHILD_THEME ? path.resolve(process.env.OR_CHILD_THEME) : null
+});
 
 export default {
   mode: isDev ? "development" : "production",
@@ -82,7 +88,12 @@ export default {
     },
     // Templates and styles are reached through the import graph, but list them explicitly so
     // a file that is only referenced (not imported) still triggers a rebuild.
-    watchFiles: ["src/**/*", "index.html"],
+    watchFiles: [
+      "src/**/*",
+      "index.html",
+      // So editing a child theme's stylesheet reloads the page as editing ours does.
+      ...(child.resourcesDir === null ? [] : [path.join(child.resourcesDir, "**/*")])
+    ],
     /*
      * Stock Keycloak pages rendered right here, from Keycloak's own templates and this page's mock
      * data: the default for the compare pane, and what an unimplemented page shows. No Keycloak
@@ -91,6 +102,7 @@ export default {
      */
     setupMiddlewares: (middlewares, devServer) => {
       stockKeycloak({ uiDir: dirname }).install(devServer.app);
+      child.install(devServer.app);
       return middlewares;
     }
   }

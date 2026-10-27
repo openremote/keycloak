@@ -234,6 +234,15 @@ Two things the page cannot hold back for you:
 - **Fonts.** A font never blocks the page. A `@font-face` with `font-display: swap`, which Google Fonts' URLs ask for, paints in a fallback first and swaps when the font arrives. Self-host the font and declare `font-display: block` or `optional` if that swap is visible.
 - **Entrance animations and transitions.** The page is hidden while the realm's branding loads: an animation that runs during that time is over before anyone sees it, and a transition the branding sets off is still running when the page appears. Scope them under `html:not(.or-booting)`.
 
+To work on one without a container, point the dev server at the theme directory:
+
+```shell
+cd theme/ui
+OR_CHILD_THEME=/path/to/deployment/keycloak/themes/acme/login yarn start
+```
+
+It serves that theme's `resources/` and applies what `orStyles` names, reloading the page when a stylesheet changes. The pages are rendered from mock data, so this is for styling: packaging, message merging and anything a realm configures still need the container.
+
 `orStyles` rather than Keycloak's own `styles=`, because that property is inherited from the fallback theme and is what the pages this theme does not implement are rendered with: reading it would put the fallback theme's stylesheet on these pages, and declaring our own would take it away from theirs.
 
 Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. It cannot override messages: every string in these pages comes from the compiled bundle.
