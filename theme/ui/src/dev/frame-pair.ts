@@ -52,10 +52,19 @@ export function createFramePair(title: string): FramePair {
 
   let front = pair[0];
 
+  /*
+   * The load in flight, abandoned when the next call starts. Both load into the same back frame,
+   * so its listeners would otherwise fire on the newer document as well and swap the pair twice,
+   * leaving neither frame showing.
+   */
+  let pending: AbortController | undefined;
+
   return {
     element,
 
     show: url => {
+      pending?.abort();
+
       const back = pair[0] === front ? pair[1] : pair[0];
 
       if (url === null) {
@@ -72,21 +81,20 @@ export function createFramePair(title: string): FramePair {
        * must not leave the pane showing the previous page indefinitely, which would be a worse
        * lie than a flash.
        */
-      let swapped = false;
+      const loading = new AbortController();
+      pending = loading;
+
       const swap = (): void => {
-        if (swapped) {
-          return;
-        }
-        swapped = true;
-        clearTimeout(timer);
+        loading.abort();
         back.removeAttribute("data-back");
         front.dataset.back = "";
         front = back;
       };
 
       const timer = setTimeout(swap, 2000);
-      back.addEventListener("load", swap, { once: true });
-      back.addEventListener("error", swap, { once: true });
+      loading.signal.addEventListener("abort", () => clearTimeout(timer));
+      back.addEventListener("load", swap, { signal: loading.signal });
+      back.addEventListener("error", swap, { signal: loading.signal });
       back.src = url;
     }
   };
