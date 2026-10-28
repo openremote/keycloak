@@ -16,16 +16,21 @@ import { i18nBuilder } from "keycloakify/login/i18n/noJsx";
  * business of maintaining auth copy. If a string reads wrong it reads wrong in every language and
  * the fix belongs upstream.
  *
- * What is left below is the two things that are not wording choices: keys Keycloak has no message
- * for at all, and a decoration the design draws in CSS instead. Nothing else belongs here, not
- * even a string that reads wrong.
+ * What is left below is the two things that are not wording choices: keys Keycloakify's bundled
+ * message set has no message for, and a decoration the design draws in CSS instead. Nothing else
+ * belongs here, not even a string that reads wrong.
  */
 
 /*
- * Keys Keycloak has no translation for in any language, so English is the only thing we can
- * fall back to. `withCustomTranslations` is the right home for exactly these: getI18n uses the
- * block for the current language if there is one and the `en` block otherwise, which means
- * anything put here leaks into every locale. Adding a language block below translates them.
+ * Keys the browser has no message for, because Keycloakify's bundled message set lacks them:
+ * ones Keycloak has no translation for in any language either, and Keycloak's own keys that
+ * Keycloakify has yet to ship, copied verbatim, without which the control renders blank. The
+ * Keycloak check fails once Keycloakify ships one of those, so it does not outstay its reason.
+ *
+ * English is the only thing we can fall back to. `withCustomTranslations` is the right home for
+ * exactly these: getI18n uses the block for the current language if there is one and the `en`
+ * block otherwise, which means anything put here leaks into every locale. Adding a language block
+ * below translates them.
  */
 const { getI18n: getI18n_base, ofTypeI18n } = i18nBuilder
   .withThemeName<"openremote">()
@@ -65,12 +70,14 @@ export type I18n = typeof ofTypeI18n;
  *
  * This is not a wording override: the text is Keycloak's in every language, only the glyph the
  * stylesheet is already drawing is taken off.
+ *
+ * The Keycloak check fails on an entry Keycloak does not define, so one left behind when a link is
+ * renamed upstream says so instead of letting the second chevron back in.
  */
 const DECORATED_LINK_KEYS = new Set([
   "backToLogin",
   "backToApplication",
   "backToLoginCredentials",
-  "backToLoginPage",
   "proceedWithAction"
 ]);
 
