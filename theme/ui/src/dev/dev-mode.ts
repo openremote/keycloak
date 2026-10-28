@@ -87,7 +87,7 @@ export function runDevMode(root: HTMLElement): void {
      *
      * The mock does list only two authenticator apps and pre-resolves their names, where
      * Keycloak sends message keys for three. Use the keys, so the preview matches the design
-     * and exercises the lookup in config-totp.ts.
+     * and exercises the lookup in login-config-totp.ts.
      */
     const totp = (kcContext as { totp?: { supportedApplications: string[] } }).totp;
 
@@ -123,6 +123,16 @@ export function runDevMode(root: HTMLElement): void {
      */
     if (pageId === "login-update-password.ftl") {
       (kcContext as { isAppInitiatedAction?: boolean }).isAppInitiatedAction = true;
+    }
+
+    /*
+     * Keycloakify mocks login-verify-email before the mail has gone out, which a user only meets
+     * when an application asked for the action. The usual way onto the page is the required
+     * action, which has sent it, and Keycloak then names the address it went to.
+     */
+    if (pageId === "login-verify-email.ftl") {
+      const verify = kcContext as { verifyEmail?: string; user?: { email: string } };
+      verify.verifyEmail = verify.user?.email;
     }
 
     renderPage(kcContext, root);

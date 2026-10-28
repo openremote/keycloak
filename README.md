@@ -123,7 +123,8 @@ Unless a case says otherwise, every one of them should also be checked for the f
 | `login`, `register`, `login-reset-password` | Their own URLs |
 | `login-config-totp`, `login-update-password`, `login-update-profile`, `update-email`, `login-verify-email` | `kc_action=CONFIGURE_TOTP` / `UPDATE_PASSWORD` / `UPDATE_PROFILE` / `UPDATE_EMAIL` / `VERIFY_EMAIL` on the auth request |
 | `login-otp`, `select-authenticator` | Set up one (or two) second factors, then log in again |
-| `idp-review-user-profile`, `login-idp-link-confirm`, `login-idp-link-email` | See **First broker login** below |
+| `idp-review-user-profile`, `login-idp-link-confirm`, `login-idp-link-email`, `login-idp-link-confirm-override` | See **First broker login** below |
+| `link-idp-action` | `kc_action=idp_link:<alias>` on the auth request, where `<alias>` is the identity provider's |
 | `login-page-expired` | Open the login page, wait past the realm's login timeout (Realm settings → Sessions), submit |
 | `info` | End of the Forgot-password flow |
 | `error` | Any auth request naming a client that does not exist |
@@ -172,6 +173,19 @@ Configure an identity provider, then:
 - **Review profile** — with Review Profile set to "on", the first sign-in through the provider shows `idp-review-user-profile` with the profile fields pre-filled from the provider, and submitting creates the account.
 - **Account already exists** — sign in through the provider with an email that already belongs to a local account. `login-idp-link-confirm` appears, with the "User with email … already exists" message in the alert. "Review profile" and "Add to existing account" must each do what they say — they are one form distinguished only by `submitAction`, so a broken button silently does the *other* thing.
 - **Verify by email** — with the flow's link action set to Email, `login-idp-link-email` appears naming the provider, the account and the realm, and the two "Click here" links re-send the mail and continue the flow.
+- **Existing link overridden**: Keycloak's default flow has no override step, so give the provider a first login flow of Detect existing broker user, Confirm override existing link and Automatically set existing user, all required. Link a local account to one account at the provider, then sign in through the provider with another account that has the same email. `login-idp-link-confirm-override` shows Keycloak's question in the alert. Confirming replaces the link and signs in, and "Click here" restarts the login.
+- **Email not trusted**: with the realm's "Verify email" on and the provider's "Trust email" off, the account a first sign-in creates lands on `login-verify-email`.
+
+#### Linking an account (`link-idp-action`)
+
+- Signed in, `kc_action=idp_link:<alias>` names the provider by its display name, not its alias. Continue goes to the provider and links the account on the way back (`kc_action_status=success`), and Cancel returns with `kc_action_status=cancelled`.
+
+#### Email verification (`login-verify-email`)
+
+The realm needs mail configured.
+
+- With "Verify email" on, a user whose email is unverified lands here after signing in. The page names the address the mail went to, and "Click here" sends it again; a second click within the cooldown shows Keycloak's message asking to wait.
+- On a signed-in session, `kc_action=VERIFY_EMAIL` for a user whose email is unverified (so with "Verify email" off) shows Send and Cancel. Send mails it and switches to the "has been sent" wording with Re-send, and Cancel returns with `kc_action_status=cancelled`. The same `kc_action` on a login without a session shows the "about to send" wording with the link and no buttons, as Keycloak's own page does.
 
 #### Page expired
 

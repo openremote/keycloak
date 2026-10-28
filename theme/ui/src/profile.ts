@@ -294,7 +294,7 @@ function select(
  * Mirrors a Vaadin component's value into the hidden input that actually gets posted.
  *
  * Needed wherever the component has no native form control of its own (select) or renames the
- * ones it owns (radio group). Same shape as the OTP device picker in src/pages/otp.ts.
+ * ones it owns (radio group). Same shape as the OTP device picker in src/pages/login-otp.ts.
  */
 function syncHiddenCarrier(name: string): (event: Event) => void {
   return event => {
