@@ -215,6 +215,40 @@ docker run ... -e OR_MANAGER_URL=http://127.0.0.1:8080 openremote/keycloak:devel
 
 It is read at render time from the theme's `theme.properties`, so it takes effect on restart with no rebuild. Such a setup also needs the Keycloak origin added to `OR_WEBSERVER_ALLOWED_ORIGINS` on the manager, since production CORS is not `*` (in dev mode the manager already allows all origins).
 
+### Custom stylesheets
+
+Branding that a realm sets in `manager_config.json` needs no theme at all. A custom project that wants to go further extends this one with a theme of its own, mounted under `/deployment/keycloak/themes` and selected per realm:
+
+```properties
+# deployment/keycloak/themes/acme/login/theme.properties
+parent=openremote
+orStyles=css/custom.css
+```
+
+The stylesheets in `orStyles` are loaded after the theme's own, so they win where specificity ties, and paths resolve against that theme's `resources` directory exactly as Keycloak's `styles=` does. With `--spi-theme-cache-themes=false --spi-theme-static-max-age=-1` on the container, editing the file is a browser refresh.
+
+They are written into the page's `<head>` by an inline script in the generated template, so they block the first paint rather than arriving after it, and the page is never painted in this theme's styling first. A child theme's stylesheet is therefore on the critical path, exactly as Keycloak's `styles=` is: a slow one is a slow login page.
+
+Two things the page cannot hold back for you:
+
+- **Fonts.** A font never blocks the page. A `@font-face` with `font-display: swap`, which Google Fonts' URLs ask for, paints in a fallback first and swaps when the font arrives. Self-host the font and declare `font-display: block` or `optional` if that swap is visible.
+- **Entrance animations and transitions.** The page is hidden while the realm's branding loads: an animation that runs during that time is over before anyone sees it, and a transition the branding sets off is still running when the page appears. Scope them under `html:not(.or-booting)`.
+
+To work on one without a container, point the dev server at the theme directory:
+
+```shell
+cd theme/ui
+OR_CHILD_THEME=/path/to/deployment/keycloak/themes/acme/login yarn start
+```
+
+It serves that theme's `resources/` and applies what `orStyles` names, reloading the page when a stylesheet changes. The pages are rendered from mock data, so this is for styling: packaging, message merging and anything a realm configures still need the container.
+
+`theme/ui/dev-server/example-theme` is a small one to start from, and `yarn start:example` runs the dev server with it.
+
+`orStyles` rather than Keycloak's own `styles=`, because that property is inherited from the fallback theme and is what the pages this theme does not implement are rendered with: reading it would put the fallback theme's stylesheet on these pages, and declaring our own would take it away from theirs.
+
+Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. It cannot override messages: every string in these pages comes from the compiled bundle.
+
 ### Translations
 
 Pages address Keycloak's own message keys, and Keycloakify ships Keycloak's bundle for ~30 languages, so enabling internationalization on a realm translates the theme.

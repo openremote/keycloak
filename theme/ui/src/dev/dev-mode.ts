@@ -11,6 +11,7 @@ import type { KcContext } from "../login/KcContext";
 import { reveal } from "../branding";
 import { implementedPageIds } from "../page-registry";
 import { applyTheme, readThemeOverride, renderPage } from "../render";
+import { applyChildTheme } from "./child-theme";
 import { compareMode, mountCompare } from "./compare";
 import { installFlows, rewriteNavigation } from "./flows";
 import { mountPageNav } from "./page-nav";
@@ -40,6 +41,8 @@ const REALM_DISPLAY_NAME = "Manufacturer";
  * existing DOM, and the design-system stylesheet and the menu are never torn down.
  */
 export function runDevMode(root: HTMLElement): void {
+  const childTheme = applyChildTheme();
+
   const currentPageId = () => new URLSearchParams(location.search).get("page") ?? "login.ftl";
   const currentSettings = () => readSettings(location.search);
   const currentLanguage = () => new URLSearchParams(location.search).get("lang");
@@ -321,9 +324,10 @@ export function runDevMode(root: HTMLElement): void {
     rendered = kcContext;
     /*
      * No manager here, and nothing in the harness can point one at the dev server, so there is
-     * nothing to fetch. The page still has to be shown, which applyBranding did on the way out.
+     * nothing to fetch. The page still has to be shown, which applyBranding did on the way out,
+     * once a child theme's stylesheets are in.
      */
-    reveal();
+    void childTheme.then(reveal);
     publish();
 
     stock.push(compare.setPage(pageId, () => renderStock("compare", kcContext, stockVariants())));
