@@ -108,21 +108,90 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
           `
         : null}
       ${realm.password && social?.providers?.length
-        ? html`
-            <div id="kc-social-providers" class="or-social">
-              <p class="or-social__label">${msgStr("identity-provider-login-label")}</p>
-              <!-- One form per provider rather than a link: Keycloak expects a POST to the
-                   provider's login URL. -->
-              ${social.providers.map(
-                provider => html`
-                  <form action=${provider.loginUrl} method="post">
-                    ${submitButton(provider.displayName, undefined, undefined, "secondary")}
-                  </form>
-                `
-              )}
-            </div>
-          `
+        ? socialProviders(social.providers, url.resourcesPath, i18n)
         : null}
     `
   });
+}
+
+type Provider = NonNullable<NonNullable<PageContext["social"]>["providers"]>[number];
+
+/*
+ * The identity providers, laid out and labelled as Keycloak's own login page does: up to three
+ * as a full-width list under "or", each button saying what it does, and more than that as a grid
+ * under a label of its own, where a button only has room for the provider's name.
+ *
+ * One form per provider, posting to its login URL, so that each is the design system's submit
+ * button. Keycloak's own page links there instead; the URL takes a POST as well as a GET.
+ */
+function socialProviders(providers: Provider[], resourcesPath: string, i18n: I18n): TemplateResult {
+  const { msgStr } = i18n;
+  const grid = providers.length > 3;
+
+  return html`
+    <div id="kc-social-providers" class="or-social">
+      <p class="or-social__label">${msgStr(grid ? "identity-provider-login-label-divider" : "orLabel")}</p>
+      <div class="or-social__providers ${grid ? "or-social__providers--grid" : ""}">
+        ${providers.map(
+          provider => html`
+            <form action=${provider.loginUrl} method="post">
+              ${submitButton(
+                grid ? provider.displayName : msgStr("signInWithProvider", provider.displayName),
+                undefined,
+                undefined,
+                "secondary",
+                providerIcon(provider.providerId, resourcesPath)
+              )}
+            </form>
+          `
+        )}
+      </div>
+    </div>
+  `;
+}
+
+/* The providers Keycloak's login page has an icon of its own for. Any other gets its generic one. */
+const ICONS = new Set([
+  "bitbucket",
+  "facebook",
+  "github",
+  "gitlab",
+  "google",
+  "instagram",
+  "linkedin-openid-connect",
+  "microsoft",
+  "openshift-v4",
+  "paypal",
+  "stackoverflow",
+  "twitter"
+]);
+
+/* The icons drawn in black, which Keycloak also has a light version of for a dark page. */
+const DARK_ICONS = new Set(["default", "github", "instagram", "twitter"]);
+
+/*
+ * The provider's icon, Keycloak's own. Our theme has none of these, and Keycloak serves a resource
+ * our theme lacks from the parent theme, so they are found under our resources path. A parent theme
+ * without them leaves the button with its label alone.
+ */
+function providerIcon(providerId: string, resourcesPath: string): TemplateResult {
+  const name = ICONS.has(providerId) ? providerId : "default";
+  const image = (file: string, variant: string) =>
+    html`<img
+      slot="prefix"
+      class="or-social__icon ${variant}"
+      src="${resourcesPath}/img/social/${file}.svg"
+      alt=""
+      @error=${hide}
+    />`;
+
+  if (!DARK_ICONS.has(name)) {
+    return image(name, "");
+  }
+
+  return html`${image(name, "or-social__icon--on-light")}${image(`${name}-light`, "or-social__icon--on-dark")}`;
+}
+
+function hide(event: Event): void {
+  (event.currentTarget as HTMLElement).hidden = true;
 }

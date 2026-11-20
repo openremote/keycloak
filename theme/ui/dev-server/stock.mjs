@@ -10,6 +10,7 @@
  *   GET  /__stock/page/<id>               a rendered page
  *   GET  /__stock/resources/<theme>/...   that theme's resources, looked up through its parents
  *   GET  /__stock/resources/common/...    the resources every theme imports
+ *   GET  /keycloakify-dev-resources/login/...  a resource our theme lacks, from its parent theme
  *
  * The model is the same shaped kcContext the harness renders our own page from, so the realm
  * settings in the menu apply to both. Wired into rspack.config.mjs's devServer only; a production
@@ -340,25 +341,44 @@ export function stockKeycloak({ uiDir }) {
         response.end(html);
       });
 
-      app.get(/^\/__stock\/resources\/(.+)$/, async (request, response) => {
+      app.get(/^\/__stock\/resources\/(.+)$/, (request, response) => {
         const relative = decodeURIComponent(request.params[0]);
-        const file = relative.includes("..") ? null : resourceFile(relative);
 
-        if (file === null) {
-          response.statusCode = 404;
-          response.end();
+        sendFile(response, relative.includes("..") ? null : resourceFile(relative));
+      });
+
+      /*
+       * Our theme's resources, which the mocks place under keycloakify-dev-resources. Keycloak looks
+       * a resource our theme does not have up in its parent theme, which is where our login page's
+       * identity-provider icons come from, so this does the same for whatever the dev server's own
+       * static files lack.
+       */
+      app.get(/^\/keycloakify-dev-resources\/login\/(.+)$/, (request, response, next) => {
+        const relative = decodeURIComponent(request.params[0]);
+
+        if (relative.includes("..") || existsSync(path.join(uiDir, "public", "keycloakify-dev-resources", "login", relative))) {
+          next();
           return;
         }
 
-        try {
-          const body = await readFile(file);
-          response.setHeader("content-type", TYPES[path.extname(file)] ?? "application/octet-stream");
-          response.end(body);
-        } catch {
-          response.statusCode = 404;
-          response.end();
-        }
+        sendFile(response, resourceFile(`${fallbackTheme()}/login/resources/${relative}`));
       });
     }
   };
+}
+
+/** A file from Keycloak's themes, or a 404 for one that is not there. */
+async function sendFile(response, file) {
+  try {
+    if (file === null) {
+      throw new Error("Not found");
+    }
+
+    const body = await readFile(file);
+    response.setHeader("content-type", TYPES[path.extname(file)] ?? "application/octet-stream");
+    response.end(body);
+  } catch {
+    response.statusCode = 404;
+    response.end();
+  }
 }

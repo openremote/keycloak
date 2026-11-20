@@ -208,14 +208,18 @@ export function submitOwningForm(event: Event): void {
  * `theme` is the Vaadin button theme: the design pairs one primary button
  * with a tertiary one, so a secondary action like Cancel should not render as a second solid
  * green button. Identity providers use "secondary": outlined, one per provider.
+ *
+ * `prefix` goes before the label in the design-system button only, as an identity provider's
+ * icon does: it should carry `slot="prefix"`.
  */
 export function submitButton(
   label: string,
   name?: string,
   value?: string,
-  theme: "primary" | "secondary" | "tertiary" = "primary"
+  theme: "primary" | "secondary" | "tertiary" = "primary",
+  prefix?: TemplateResult
 ): TemplateResult {
-  return submit({ label, name, value, theme });
+  return submit({ label, name, value, theme, prefix });
 }
 
 /**
@@ -248,15 +252,16 @@ type SubmitOptions = {
   value?: string;
   theme: "primary" | "secondary" | "tertiary";
   novalidate?: boolean;
+  prefix?: TemplateResult;
 };
 
 function submit(options: SubmitOptions): TemplateResult {
-  const { label, name, value, theme, novalidate = false } = options;
+  const { label, name, value, theme, novalidate = false, prefix } = options;
 
   return html`
     <div class="or-submit">
       <or-vaadin-button class="or-submit__styled" theme=${theme} @click=${submitOwningForm}>
-        ${label}
+        ${prefix}${label}
       </or-vaadin-button>
       <button
         class="or-submit__fallback"

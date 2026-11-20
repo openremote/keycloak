@@ -35,7 +35,12 @@ const KEYCLOAK_STAND_INS = {
   emailVerifyInstruction4:
     "To verify your email address, we are about to send you email with instructions to the address {0}.",
   emailVerifyResend: "Re-send verification email",
-  emailVerifySend: "Send verification email"
+  emailVerifySend: "Send verification email",
+  // The login page's identity providers: "or" above up to three, "Sign in with" on each of their
+  // buttons, and "or sign in with" above a grid of more.
+  "identity-provider-login-label-divider": "or sign in with",
+  orLabel: "or",
+  signInWithProvider: "Sign in with {0}"
 };
 
 /*

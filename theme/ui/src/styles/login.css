@@ -594,21 +594,55 @@ or-vaadin-button:not(:defined) {
  * ------------------------------------------------------------------------ */
 
 /*
- * The providers are a tinted panel inside the card, not a rule across it with a label in the
- * middle, which is the common pattern but not the one the design draws.
+ * The providers sit on the card as Keycloak's own page has them, with no panel of their own: a
+ * label, then a full-width list, or past three providers a grid of two columns, which drops to
+ * one on a narrow screen as Keycloak's does (PatternFly's sm breakpoint, 576px).
  *
  * The buttons need nothing: `theme="secondary"` already computes to exactly what the design
  * specifies (contrast-5pct fill, border-radius-m, primary text, font-size-m, weight 500, 36px).
  * Verified in a browser rather than assumed.
  */
-.or-social {
+.or-social,
+.or-social__providers {
   display: flex;
   flex-direction: column;
-  /* Spacing/spacing-m, which is also the gap between the buttons inside the panel. */
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: var(--lumo-border-radius-l, 0.75em);
-  background-color: var(--or-color-contrast-5pct);
+  gap: var(--lumo-space-m);
+}
+
+@media (min-width: 36em) {
+  .or-social__providers--grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/*
+ * The icon at the button's start and the label centred in the space after it, as Keycloak's own
+ * provider buttons have them, rather than the two centred together.
+ */
+.or-social or-vaadin-button::part(label) {
+  flex: 1;
+  text-align: center;
+}
+
+/* Keycloak's icon for the provider, and its light version where it has one for a dark page. */
+.or-social__icon {
+  display: block;
+  width: var(--lumo-icon-size-s);
+  height: var(--lumo-icon-size-s);
+}
+
+.or-social__icon--on-dark,
+.or-social__icon[hidden] {
+  display: none;
+}
+
+:root[theme~="dark"] .or-social__icon--on-light {
+  display: none;
+}
+
+:root[theme~="dark"] .or-social__icon--on-dark:not([hidden]) {
+  display: block;
 }
 
 /*
@@ -620,7 +654,7 @@ or-vaadin-button:not(:defined) {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* The panel's gap does the spacing; a <p>'s own margin would add to it. */
+  /* The gap above does the spacing; a <p>'s own margin would add to it. */
   margin: 0;
   height: 36px;
   font-size: var(--lumo-font-size-m, 1rem);
