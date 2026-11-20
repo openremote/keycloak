@@ -112,7 +112,8 @@ Most of what this theme depends on lives in Keycloak rather than here: the messa
 | --- | --- |
 | Every page in `src/pages` still exists upstream | A page we replaced is gone, so ours renders where Keycloak has nothing |
 | Every message key the theme names is defined by Keycloak | The key was dropped or renamed. It still type-checks, because the types come from Keycloakify's copy, but the server resolves nothing |
-| No stand-in in `src/i18n.ts` is redundant | Keycloakify now ships a key we were carrying ourselves, so ours can go and every locale gets Keycloak's own translation |
+| Every key in `KEYCLOAK_STAND_INS`, in `src/i18n.ts`, is Keycloak's and missing from the installed Keycloakify | Keycloakify now ships it, so ours can go and every locale gets Keycloak's own translation. Or Keycloak no longer defines it |
+| No key in `OWN_MESSAGES`, in `src/i18n.ts`, is defined by Keycloak or Keycloakify | Ours would hide their translations in every language |
 | Every key in `DECORATED_LINK_KEYS`, in `src/i18n.ts`, is defined by Keycloak or by a stand-in | Keycloak renamed a link whose chevron we take off, so the page, on the new key, would show two. Or the key never existed, and the entry strips nothing |
 | No key the script records as never defined upstream is defined now | Keycloak added a message for something we were standing in for, so the exception can go |
 | Every key in `UPSTREAM_ONLY` is one Keycloak names behind our pages and our theme does not | The decision it records has nothing left to apply to, so the entry can go |
@@ -139,7 +140,8 @@ The Vaadin components and the design system have their own versions and their ow
 
 - **`Keycloak <version> has no <page>.ftl`** — our page has no counterpart any more, so it is dead weight in the jar. Remove it, or repoint it at whatever replaced it.
 - **`Message key "x" is not defined by Keycloak <version>`** — find the control in Keycloak's own template for that page and use the key it uses now. If the key never existed upstream and naming it is still right, as with `languages`, which Keycloak's own `template.ftl` names too, add it to `UNDEFINED_UPSTREAM` in the check with the reason.
-- **`i18n.ts carries "x" only because ...`** — delete that entry from `withCustomTranslations`.
+- **`src/i18n.ts stands in for "x" only because ...`** — delete that entry from `KEYCLOAK_STAND_INS`.
+- **`KEYCLOAK_STAND_INS in src/i18n.ts lists "x" ...`** or **`OWN_MESSAGES in src/i18n.ts lists "x" ...`**: the key is in the wrong object, or Keycloak renamed it. The message says which.
 - **`DECORATED_LINK_KEYS in src/i18n.ts lists "x" ...`**: if Keycloak renamed that link, list its new key there instead; otherwise drop the entry.
 - **`### Failure: Drift detected`** in the upgrade report: Keycloak relabelled a control we also have. Use its key on our page, or add the key to `UPSTREAM_ONLY` with the reason beside it.
 - **`UPSTREAM_ONLY lists "x" ...`**: that entry has outlived itself, because Keycloak does not name the key behind any page we implement, or because this theme names it now. Drop it, or check the spelling.

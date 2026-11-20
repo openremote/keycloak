@@ -473,35 +473,33 @@ function sourceFiles(dir) {
 const TOKEN = /(?<comment>\/\/[^\n]*|\/\*[\s\S]*?\*\/)|(?<quote>["'`])(?<string>(?:\\[\s\S]|(?!\k<quote>)[^\\])*)\k<quote>|(?<word>\w+)|\S/g;
 
 /**
- * The keys declared in i18n.ts's withCustomTranslations block.
+ * The keys of an object in i18n.ts, found by what opens it: `KEYCLOAK_STAND_INS =` for one of the
+ * message objects, whose keys are at depth 1, or `withCustomTranslations(` for the keys the call
+ * declares itself, at depth 2, inside a language tag.
  *
  * Read from its tokens rather than by matching indentation, so reformatting that file cannot
- * quietly turn this into an empty list, and a comment that writes the call out is not taken for
- * it. Depth 2 is a message key: depth 1 is the argument, whose own keys are the language tags the
- * block is organized by. A key is the string or word a property opens with, so the prose after it
- * cannot name one.
+ * quietly turn this into an empty list, and a comment that writes the code out is not taken for
+ * it. A key is the string or word a property opens with, so the prose after it cannot name one.
  */
-function customTranslationKeys() {
+function objectKeys(opener, keyDepth) {
   const tokens = i18nTokens();
-  const start = tokens.findIndex(
-    (token, i) => token.groups.word === "withCustomTranslations" && tokens[i + 1]?.[0] === "("
-  );
+  const start = tokens.findIndex((_, i) => opener.every((text, j) => tokens[i + j]?.[0] === text));
 
   if (start === -1) {
-    throw new Error("No withCustomTranslations call in src/i18n.ts");
+    throw new Error(`No \`${opener.join(" ")}\` in src/i18n.ts`);
   }
 
   const keys = [];
   let depth = 0;
 
-  for (let i = start + 2; i < tokens.length; i++) {
+  for (let i = start + opener.length; i < tokens.length; i++) {
     const text = tokens[i][0];
 
     if (text === "{") {
       depth++;
     } else if (text === "}" && --depth === 0) {
       break;
-    } else if (text === ":" && depth === 2 && ["{", ","].includes(tokens[i - 2][0])) {
+    } else if (text === ":" && depth === keyDepth && ["{", ","].includes(tokens[i - 2][0])) {
       keys.push(tokens[i - 1].groups.string ?? tokens[i - 1].groups.word);
     }
   }
@@ -567,7 +565,9 @@ const pages = implementedPages();
 const names = new Set(templateNames(root));
 const messages = keycloakMessages(root);
 const requested = requestedMessageKeys();
-const ourKeys = customTranslationKeys();
+const keycloakStandIns = objectKeys(["KEYCLOAK_STAND_INS", "="], 1);
+const ownMessages = objectKeys(["OWN_MESSAGES", "="], 1);
+const ourKeys = [...keycloakStandIns, ...ownMessages];
 const decorated = decoratedLinkKeys();
 const keycloakifyMessages = (await import("keycloakify/login/i18n/messages_defaultSet/en.js")).default;
 
@@ -598,16 +598,39 @@ for (const key of UNDEFINED_UPSTREAM) {
   }
 }
 
+/* A key the call declares itself is in neither object, so nothing here would say when it can go. */
+for (const key of objectKeys(["withCustomTranslations", "("], 2)) {
+  problems.push(
+    `withCustomTranslations in src/i18n.ts declares "${key}" itself. Put it in KEYCLOAK_STAND_INS or ` +
+      "OWN_MESSAGES, so this check knows which it is."
+  );
+}
+
 /*
- * Both, not just Keycloak's own bundle: Keycloakify's is what resolves a key in the browser, so a
- * key Keycloak defines and Keycloakify has yet to ship still needs ours, blank button otherwise.
- * The entries in i18n.ts say which are there for that reason.
+ * A stand-in is one of Keycloak's messages that Keycloakify's bundled set lacks. Keycloakify's set
+ * is what resolves a key in the browser, so until it ships one, ours is all that renders.
  */
-for (const key of ourKeys) {
-  if (messages.has(key) && Object.hasOwn(keycloakifyMessages, key)) {
+for (const key of keycloakStandIns) {
+  if (!messages.has(key)) {
     problems.push(
-      `i18n.ts carries "${key}" only because Keycloakify's message set lacked it. It ships it ` +
-        "now, so delete ours and let Keycloak's own translation through."
+      `KEYCLOAK_STAND_INS in src/i18n.ts lists "${key}", which Keycloak ${version} does not define. ` +
+        "If Keycloak renamed it, follow the rename. If it is a message of our own, move it to OWN_MESSAGES."
+    );
+  } else if (Object.hasOwn(keycloakifyMessages, key)) {
+    problems.push(
+      `src/i18n.ts stands in for "${key}" only because Keycloakify's message set lacked it. It ships ` +
+        "it now, so delete ours from KEYCLOAK_STAND_INS and let Keycloak's own translation through."
+    );
+  }
+}
+
+/* Ours shows in every language, so over a key Keycloak or Keycloakify defines it hides their translations. */
+for (const key of ownMessages) {
+  if (messages.has(key) || Object.hasOwn(keycloakifyMessages, key)) {
+    problems.push(
+      `OWN_MESSAGES in src/i18n.ts lists "${key}", which ${messages.has(key) ? `Keycloak ${version}` : "Keycloakify"} ` +
+        "defines now, and ours hides its translations. If it means the same, move it to KEYCLOAK_STAND_INS " +
+        "with Keycloak's English while Keycloakify lacks it, or drop it. Otherwise rename ours."
     );
   }
 }
@@ -751,11 +774,11 @@ const reworded = requested
   .sort();
 
 /*
- * A stand-in of ours Keycloak has started defining, so ours is English over a string it now
- * translates. Not a failure: Keycloakify's bundle is what resolves a key in the browser, and until
- * it ships this one, ours is the only thing that renders. The check above fails when it does.
+ * Stand-ins for keys Keycloak has started defining in this version, so ours is English over a
+ * string it translates. Not a failure: until Keycloakify ships one, ours is all that renders, and
+ * the check above fails when it does.
  */
-const nowUpstream = ourKeys.filter(key => messages.has(key) && !messagesBefore.has(key)).sort();
+const nowUpstream = keycloakStandIns.filter(key => !messagesBefore.has(key)).sort();
 
 /* The release notes cover far more than templates and keys, and both URLs come from the version. */
 const lines = [
