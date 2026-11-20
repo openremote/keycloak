@@ -22,51 +22,46 @@ import { i18nBuilder } from "keycloakify/login/i18n/noJsx";
  */
 
 /*
- * Keys the browser has no message for, because Keycloakify's bundled message set lacks them:
- * ones Keycloak has no translation for in any language either, and Keycloak's own keys that
- * Keycloakify has yet to ship, copied verbatim, without which the control renders blank. The
- * Keycloak check fails once Keycloakify ships one of those, so it does not outstay its reason.
- *
- * English is the only thing we can fall back to. `withCustomTranslations` is the right home for
- * exactly these: getI18n uses the block for the current language if there is one and the `en`
- * block otherwise, which means anything put here leaks into every locale. Adding a language block
- * below translates them.
+ * Keycloak's own messages that Keycloakify's bundled message set has yet to ship, copied verbatim
+ * from Keycloak's English. Without one, the control it labels renders blank. Each is temporary:
+ * the Keycloak check fails once the installed Keycloakify has it, and then it goes.
+ */
+const KEYCLOAK_STAND_INS = {
+  // The organization switcher, under "Try another way".
+  doSwitchOrganization: "Switch Organization",
+  // The error page, when tracing is on: the identifier support asks for.
+  traceIdSupportMessage: "If you contact support, please provide the following trace identifier: {0}",
+  // The verify-email page an application opens as a required action.
+  emailVerifyInstruction4:
+    "To verify your email address, we are about to send you email with instructions to the address {0}.",
+  emailVerifyResend: "Re-send verification email",
+  emailVerifySend: "Send verification email"
+};
+
+/*
+ * Messages of our own, for what Keycloak's templates have no key for. Neither Keycloak nor
+ * Keycloakify defines any of them, and the check fails if one starts to: ours would hide its
+ * translations.
+ */
+const OWN_MESSAGES = {
+  // Additions to Keycloak's login-otp.ftl, which offers no way back and gives its list of devices
+  // no label.
+  backToLoginCredentials: "Back to login credentials",
+  select2faDevice: "Select your 2FA device",
+  // An OTP credential the user saved without naming it. Keycloak's own template renders the blank
+  // label as it is, giving a radio with no accessible name.
+  otpDeviceFallback: "Device {0}"
+};
+
+/*
+ * English is the only thing either can fall back to. getI18n uses the block for the current
+ * language if there is one and the `en` block otherwise, so everything here shows in every
+ * language. Adding a language block below translates them.
  */
 const { getI18n: getI18n_base, ofTypeI18n } = i18nBuilder
   .withThemeName<"openremote">()
   .withCustomTranslations({
-    en: {
-      // Both of these are additions to Keycloak's own login-otp.ftl, which offers no way back
-      // and gives its list of devices no label at all, so there is no key to reuse.
-      backToLoginCredentials: "Back to login credentials",
-      select2faDevice: "Select your 2FA device",
-      /*
-       * Not ours: this is Keycloak's own string, verbatim, capital O and all
-       * (26.7 messages_en.properties line 18). It is here only because Keycloakify's bundled
-       * copy of the message set predates it, so removing this line blanks the button rather
-       * than falling back to Keycloak's wording. Delete it once Keycloakify catches up.
-       */
-      doSwitchOrganization: "Switch Organization",
-      /*
-       * Keycloak's own string too (26.7 messages_en.properties), for the same reason: its
-       * error page prints the trace identifier support asks for, and Keycloakify's bundled
-       * message set predates the key. Only ever shown when tracing is enabled on the server.
-       */
-      traceIdSupportMessage:
-        "If you contact support, please provide the following trace identifier: {0}",
-      /*
-       * Keycloak's own strings as well (26.7 messages_en.properties lines 175 to 177), for the
-       * same reason: the verify-email page Keycloak shows an application-initiated action
-       * names them, and Keycloakify's bundled message set predates them.
-       */
-      emailVerifyInstruction4:
-        "To verify your email address, we are about to send you email with instructions to the address {0}.",
-      emailVerifyResend: "Re-send verification email",
-      emailVerifySend: "Send verification email",
-      // Fallback label for an OTP credential the user saved without naming it. Keycloak's own
-      // template renders the blank label as-is, giving a radio with no accessible name.
-      otpDeviceFallback: "Device {0}"
-    }
+    en: { ...KEYCLOAK_STAND_INS, ...OWN_MESSAGES }
   })
   .build();
 
