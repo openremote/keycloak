@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>OpenRemote</title>
+    <style>
+      /* Inline, not in login.css: a stylesheet that is still loading cannot hide anything,
+         and WebKit runs the bundle before the ones in the markup are applied. */
+      html.or-booting body {
+        visibility: hidden;
+      }
+    </style>
+    <script>
+      // Resolve the color scheme before first paint, so a dark page never flashes light
+      // while the bundle boots. main.ts applies the same rule once it runs; this only moves
+      // the first application earlier. ?theme= is a dev-only override.
+      (function () {
+        // Off until the manager has dark mode too. Also see src/render.ts.
+        const FOLLOW_SYSTEM_DARK_MODE = false;
+        const override = new URLSearchParams(location.search).get("theme");
+        const prefersDark =
+          FOLLOW_SYSTEM_DARK_MODE &&
+          (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false);
+
+        if (override === "dark" || (override !== "light" && prefersDark)) {
+          document.documentElement.setAttribute("theme", "dark");
+        }
+
+        // Per-realm branding (logo, app title, brand color) is fetched at runtime, so keep
+        // the page hidden until it lands. Otherwise stock OpenRemote branding paints first.
+        // applyBranding takes the class off again, and main.ts arms a timeout before it
+        // renders, so this can never be permanent.
+        //
+        // Added from script rather than written into <html> above, because only a script can
+        // take it off again: with JavaScript off the class is never added in the first place,
+        // and the visitor gets the unbranded page instead of a blank one.
+        document.documentElement.classList.add("or-booting");
+      })();
+    </script>
+    <% for tag in htmlRspackPlugin.tags.headTags { %><%= toHtml(tag) %><% } %>
+    <script>
+      /*
+       * A child theme's stylesheets, written out while the parser is still in the head, so they
+       * block the first paint exactly as Keycloak's own `styles=` does. Appended from the bundle
+       * instead, they arrived after the page had been built and painted with the theme's own
+       * styling, and it visibly flipped.
+       *
+       * After the bundle's tags above, so a child theme wins where specificity ties.
+       *
+       * Nothing here may use a template literal or `$` followed by a brace: the build turns this
+       * file into a FreeMarker template, where that is an interpolation.
+       */
+      (function () {
+        const kcContext = window.kcContext;
+        const declared = kcContext && kcContext.properties && kcContext.properties.orStyles;
+        const resourcesPath = kcContext && kcContext.url && kcContext.url.resourcesPath;
+
+        if (!declared || !resourcesPath) {
+          return;
+        }
+
+        for (const path of declared.trim().split(/\s+/)) {
+          const link = document.createElement("link");
+
+          link.rel = "stylesheet";
+          link.href = /^(?:https?:)?\/\//.test(path) ? path : resourcesPath + "/" + path;
+
+          // Serialized by the DOM rather than built by hand, so an & or a " in the path arrives
+          // as it was written.
+          document.write(link.outerHTML);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <% for tag in htmlRspackPlugin.tags.bodyTags { %><%= toHtml(tag) %><% } %>
+  </body>
+</html>
