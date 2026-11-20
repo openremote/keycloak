@@ -5,7 +5,7 @@
  * into ui/.keycloak (gitignored). This module starts StockRenderer.java once, with the JDK's
  * single-file launcher, and exposes it to the dev harness:
  *
- *   GET  /__stock/status                  what is installed, or why nothing is
+ *   GET  /__stock/status                  what is installed, and its pages, or why nothing is
  *   POST /__stock/render                  {theme, pageId, locale, model, variants?} -> {url, changed}
  *   GET  /__stock/page/<id>               a rendered page
  *   GET  /__stock/resources/<theme>/...   that theme's resources, looked up through its parents
@@ -18,7 +18,7 @@
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createInterface } from "node:readline";
@@ -125,7 +125,32 @@ export function stockKeycloak({ uiDir }) {
     }
 
     const manifest = JSON.parse(readFileSync(manifestFile, "utf8"));
-    return { available: true, ...manifest, compareTheme: COMPARE_THEME, fallbackTheme: fallbackTheme() };
+    return {
+      available: true,
+      ...manifest,
+      compareTheme: COMPARE_THEME,
+      fallbackTheme: fallbackTheme()
+    };
+  };
+
+  /*
+   * The pages Keycloak serves from a theme, through its parents: the templates that call the layout
+   * macro, which template.ftl defines and the other macros are imported into.
+   */
+  const stockPages = theme => {
+    const pages = new Set();
+
+    for (; theme; theme = themeProperties(path.join(themesDir, theme, "login", "theme.properties")).parent) {
+      const dir = path.join(themesDir, theme, "login");
+
+      for (const name of existsSync(dir) ? readdirSync(dir) : []) {
+        if (name.endsWith(".ftl") && /<@[\w.]*registrationLayout/.test(readFileSync(path.join(dir, name), "utf8"))) {
+          pages.add(name);
+        }
+      }
+    }
+
+    return [...pages].sort();
   };
 
   /* ------------------------------------------------------------------ renderer process */
@@ -324,7 +349,11 @@ export function stockKeycloak({ uiDir }) {
 
   return {
     install(app) {
-      app.get("/__stock/status", (_request, response) => sendJson(response, 200, status()));
+      // Its pages only here: listing them reads every template, and no other request needs them.
+      app.get("/__stock/status", (_request, response) => {
+        const current = status();
+        sendJson(response, 200, current.available ? { ...current, pages: stockPages(current.fallbackTheme) } : current);
+      });
 
       app.post("/__stock/render", (request, response) => {
         handleRender(request, response).catch(error => sendJson(response, 500, { error: error.message }));

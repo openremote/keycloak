@@ -10,8 +10,10 @@
  *
  *   - every page comes from kcContextMocks, the same data getKcContextMock serves
  *   - implemented pages come from src/pages via the build-time context module
+ *   - Keycloak's pages Keycloakify has no mock for come from the dev server, which has Keycloak's
+ *     themes once they are downloaded
  *
- * so adding a page file, or upgrading Keycloakify, updates this automatically.
+ * so adding a page file, or upgrading Keycloakify or Keycloak, updates this automatically.
  *
  * Rendered with Lit, like the pages themselves. Shorter than building the menu by hand, but the
  * reason is that Lit only writes a binding whose value actually changed. That is what keeps the
@@ -146,6 +148,16 @@ const STYLES = `
 }
 /* The pages Keycloakify would hand us with no implementation. */
 .dev-nav__group--fallback a { color: rgba(255, 255, 255, 0.42); }
+/* Keycloak's pages with no mock to render them from: listed, not linked. */
+.dev-nav__unmocked {
+  padding: 0.2rem 0.4rem;
+  color: rgba(255, 255, 255, 0.28);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
 .dev-nav a:hover { background: rgba(255, 255, 255, 0.16); }
 .dev-nav a[aria-current="page"] { background: #4caf50; color: #fff; }
 
@@ -404,6 +416,29 @@ function pageGroup(heading: string, pageIds: string[], modifier?: string): Templ
   `;
 }
 
+/*
+ * Keycloak's pages that Keycloakify has no mock for, so neither our page nor Keycloak's can be
+ * rendered here. Listed so the gap shows, rather than the page silently not existing in the menu.
+ */
+function unmockedGroup(): TemplateResult | typeof nothing {
+  if (unmocked.length === 0) {
+    return nothing;
+  }
+
+  return html`
+    <div class="dev-nav__group">
+      <span class="dev-nav__heading">no Keycloakify mock</span>
+      ${unmocked.map(
+        pageId => html`<span
+          class="dev-nav__unmocked"
+          title="${pageId}: Keycloak serves it, but Keycloakify has no mock to render it from"
+          >${pageId.replace(/\.ftl$/, "")}</span
+        >`
+      )}
+    </div>
+  `;
+}
+
 /* ---------------------------------------------------------------------------------- menu */
 
 let navigate: (search: string) => void = () => undefined;
@@ -412,6 +447,7 @@ let current = "";
 let toggles: readonly Toggle[] = [];
 let active: readonly string[] = [];
 let hidden: readonly Toggle[] = [];
+let unmocked: readonly string[] = [];
 
 /*
  * One host in the document, holding both the menu and its tab: the tab is a sibling rather than a
@@ -446,7 +482,7 @@ function rerender(): void {
         <!-- Before the page groups: the "not implemented" list is long, and anything after
              it is scrolled out of sight. -->
         ${pageGroup("implemented", IMPLEMENTED)}
-        ${pageGroup("not implemented", NOT_IMPLEMENTED, "fallback")}
+        ${pageGroup("not implemented", NOT_IMPLEMENTED, "fallback")} ${unmockedGroup()}
       </nav>
       <button
         class="dev-nav__toggle ${open ? "is-open" : ""}"
@@ -482,6 +518,15 @@ export function mountPageNav(options: PageNavOptions): PageNav {
     }
   });
   setOpen(!narrow.matches && new URLSearchParams(location.search).get("nav") !== "closed");
+
+  // Without Keycloak's themes downloaded there is nothing to compare against, and no such group.
+  void fetch("/__stock/status")
+    .then(response => response.json() as Promise<{ pages?: string[] }>)
+    .then(status => {
+      unmocked = (status.pages ?? []).filter(pageId => !ALL_PAGE_IDS.includes(pageId));
+      rerender();
+    })
+    .catch(() => undefined);
 
   const setCurrent: PageNav["setCurrent"] = (
     pageId,
