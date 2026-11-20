@@ -200,6 +200,18 @@ export function runDevMode(root: HTMLElement): void {
       webauthn.residentKey = "not specified";
     }
 
+    /*
+     * The identity-brokering pages are handed the provider's display name as well as its alias,
+     * and Keycloak's own templates show only the name. Some mocks carry the alias alone, so
+     * Keycloak's page read "Link null". The alias stands in, as it would for a provider no one
+     * gave a display name.
+     */
+    const broker = kcContext as { idpAlias?: string; idpDisplayName?: string };
+
+    if (broker.idpAlias !== undefined && broker.idpDisplayName === undefined) {
+      broker.idpDisplayName = broker.idpAlias;
+    }
+
     applySettings(kcContext, settings);
 
     /*
