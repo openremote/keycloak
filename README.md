@@ -247,7 +247,7 @@ It serves that theme's `resources/` and applies what `orStyles` names, reloading
 
 `orStyles` rather than Keycloak's own `styles=`, because that property is inherited from the fallback theme and is what the pages this theme does not implement are rendered with: reading it would put the fallback theme's stylesheet on these pages, and declaring our own would take it away from theirs.
 
-Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. It cannot override messages: every string in these pages comes from the compiled bundle.
+Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. It cannot override most messages, which come from the compiled bundle. The exceptions are the ones the server resolves for the page: the terms text (`termsText`), the names of required actions, and labels a realm configures, such as user-profile attributes. A child theme's `messages_*.properties` reaches those, as do a realm's localization overrides.
 
 ### Translations
 
