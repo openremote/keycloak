@@ -3,7 +3,8 @@
 # The build only proves the theme compiles and packages. It cannot say whether the pages this
 # theme replaces still exist upstream, or whether the message keys it names are still defined,
 # so this does, against the version the Dockerfile pins. On a branch that moves that version it
-# also reports which of Keycloak's own versions of our pages changed, into the job summary.
+# also writes a report to the job summary: what changed in Keycloak's version of our pages, and how
+# far the installed Keycloakify is behind the newest release Yarn would install.
 #
 # Separate from the CI/CD workflow on purpose: this is the one job that reaches Maven Central,
 # and a release build must not fail because that was unreachable.
@@ -26,7 +27,9 @@ on:
       - 'theme/ui/package.json'
       - 'theme/ui/yarn.lock'
       - 'theme/ui/dev-server/**'
-      - 'theme/build.gradle'
+      # The report asks the Yarn release .yarnrc.yml names, with its registry settings.
+      - 'theme/ui/.yarnrc.yml'
+      - 'theme/ui/.yarn/releases/**'
 
   pull_request:
     paths:
@@ -41,7 +44,8 @@ on:
       - 'theme/ui/package.json'
       - 'theme/ui/yarn.lock'
       - 'theme/ui/dev-server/**'
-      - 'theme/build.gradle'
+      - 'theme/ui/.yarnrc.yml'
+      - 'theme/ui/.yarn/releases/**'
 
   workflow_dispatch:
 
