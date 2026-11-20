@@ -31,13 +31,14 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
       <form id="kc-idp-link-confirm-form" action=${url.loginAction} method="post">
         <div class="or-actions">
           <!--
-            Keycloak renders these the other way round and gives neither precedence. Linking is
-            made the primary action because it is the one the flow exists to offer: the user
+            Keycloak makes linking the primary action too, but puts the review button above it.
+            Linking comes first here because it is the one the flow exists to offer: the user
             has just proved they own the provider account, and reviewing the profile is the
             detour. The design's Actions frame pairs exactly one primary with one tertiary.
 
-            The argument is unused by the English message ("Add to existing account") but not by
-            every translation, and it is what Keycloak passes.
+            The argument is unused by the English message ("Add to existing account"), and
+            Keycloak's button macro passes none, but Keycloakify's French message, which is the
+            one the browser resolves, has a placeholder for it.
           -->
           ${submitButton(
             msgStr("confirmLinkIdpContinue", idpDisplayName ?? idpAlias),
