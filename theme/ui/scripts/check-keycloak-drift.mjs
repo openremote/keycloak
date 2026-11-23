@@ -557,9 +557,9 @@ function installedKeycloakify() {
 }
 
 /*
- * The Keycloakify releases newer than the installed one, in its major, that Yarn would install,
- * oldest first. Asked of Yarn, so the registry, credentials and proxy in .yarnrc.yml apply, and
- * held to its npmMinimalAgeGate, which Yarn applies to an install but not to `npm info`.
+ * The Keycloakify releases newer than the installed one, oldest first, including those Yarn's
+ * npmMinimalAgeGate still holds back, which `npm info` does not apply: one of them may have what an
+ * upgrade needs. Asked of Yarn, so the registry, credentials and proxy in .yarnrc.yml apply.
  */
 function newerKeycloakify(installed) {
   const yarnPath = /^yarnPath:\s*(\S+)\s*$/m.exec(readFileSync(join(UI_DIR, ".yarnrc.yml"), "utf8"))?.[1];
@@ -577,13 +577,10 @@ function newerKeycloakify(installed) {
         timeout: DOWNLOAD_TIMEOUT_MS
       })
     );
-  const { versions, time } = yarn("npm", "info", "keycloakify", "--fields", "versions,time");
-  const publishedBy = Date.now() - yarn("config", "get", "npmMinimalAgeGate") * 60_000;
-  const major = installed.version.split(".")[0];
+  const { versions } = yarn("npm", "info", "keycloakify", "--fields", "versions");
 
   return versions
-    .filter(release => /^\d+\.\d+\.\d+$/.test(release) && release.split(".")[0] === major)
-    .filter(release => compareVersions(release, installed.version) > 0 && Date.parse(time[release]) <= publishedBy)
+    .filter(release => /^\d+\.\d+\.\d+$/.test(release) && compareVersions(release, installed.version) > 0)
     .sort(compareVersions);
 }
 
@@ -751,7 +748,6 @@ if (before === undefined) {
 const previousRoot = await themesRoot(before);
 const keycloakify = installedKeycloakify();
 const newer = newerKeycloakify(keycloakify);
-const major = keycloakify.version.split(".")[0];
 const I18N = repoPath(join(UI_DIR, "src", "i18n.ts"));
 
 /* Both versions, so a template imported in only one of them, or moved between themes, is watched. */
@@ -1025,7 +1021,7 @@ function newPageItem(page) {
   const [served] = asServed(root, [page]);
   const verdict = keycloakify.types.includes(`"${page}"`)
     ? `Keycloakify ${keycloakify.version} has it: see it in the dev server, and add it to \`theme/ui/src/pages\` if it should look like ours.`
-    : `Keycloakify ${keycloakify.version} has no types or mock for it, so it can be neither built on nor seen in the dev server.`;
+    : `Keycloakify ${keycloakify.version} has no types or mock for it, so it can neither be built on nor seen in the dev server.`;
 
   return [`- ${code(page)}, served from ${code(served.split("/")[0])}`, `  - ${verdict}`];
 }
@@ -1039,7 +1035,7 @@ if (relabelled.length > 0 || unplaced.length > 0) {
     "### Keycloak relabelled a control on our pages",
     "",
     "Keycloak's version of our pages uses new message keys, for a control it relabelled or added, while our " +
-      `theme does not. Use the keys on our pages or add them to \`UPSTREAM_ONLY\` in \`${SCRIPT}\`. A removed ` +
+      `theme does not. Use those keys on our pages or add them to \`UPSTREAM_ONLY\` in \`${SCRIPT}\`. A removed ` +
       "key is one Keycloak dropped there that our page still uses, often the one a new key replaces." +
       /*
        * What adopting a key costs where the installed Keycloakify has no message for it: a stand-in
@@ -1075,9 +1071,10 @@ if (reworded.length > 0) {
   others.push([
     "### Reworded upstream",
     "",
-    "Keycloak changed the English of these messages. Our pages show Keycloakify's copy instead, which a " +
-      "Keycloakify release updates, so there is nothing to do here. Only where the last column names our " +
-      "stand-in, copy Keycloak's new English into it.",
+    "Keycloak changed the English of these messages. Our pages use Keycloakify's messages so update Keycloakify." +
+      (reworded.some(key => !Object.hasOwn(keycloakifyMessages, key))
+        ? ` Where the last column names our stand-in, update it in \`${I18N}\` to Keycloak's new English.`
+        : ""),
     "",
     ...rewordedTable(reworded)
   ]);
@@ -1099,7 +1096,7 @@ if (newPages.length > 0) {
   others.push([
     "### New pages upstream",
     "",
-    "Our theme does not implement these, so Keycloak serves its own, in its look rather than ours.",
+    "Our theme does not implement these, so Keycloak serves its own.",
     "",
     ...newPages.flatMap(newPageItem)
   ]);
@@ -1131,22 +1128,21 @@ const group = (title, sections) => [
 
 /*
  * How far the installed Keycloakify is behind, and the commands that find out whether a newer one
- * helps, leaving the version to Yarn.
+ * helps.
  */
 function keycloakifyLag() {
   const intro = "Our pages take their types, dev-server mocks and messages from Keycloakify, not from Keycloak.";
 
   if (newer.length === 0) {
-    return [`${intro} ${keycloakify.version} is installed, and Yarn would install no newer ${major}.x.`];
+    return [`${intro} ${keycloakify.version} is installed, the newest release.`];
   }
 
   const newest = newer.at(-1);
   const releases = newer.length === 1 ? "1 release" : `${newer.length} releases`;
 
   return [
-    `${intro} ${keycloakify.version} is installed, ${releases} behind ${newest}, the newest ${major}.x Yarn would ` +
-      `install. Where something below is missing from ${keycloakify.version}, upgrade and run this check again to ` +
-      `see whether ${newest} has it:`,
+    `${intro} ${keycloakify.version} is installed, ${releases} behind the newest (${newest}). Where something below ` +
+      `is missing from ${keycloakify.version}, upgrade and run this check again to see whether ${newest} has it:`,
     "",
     "```sh",
     "yarn up keycloakify",
