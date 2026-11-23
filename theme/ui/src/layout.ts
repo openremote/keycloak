@@ -147,20 +147,16 @@ function flowActions(kcContext: KcContext, i18n: I18n): TemplateResult | null {
  *
  * Keycloak models each language as a GET to its own URL, so the select is a navigation control
  * rather than a form input: `change` fires only on a real user choice, and the value is the
- * language tag mapped back to the URL Keycloak gave us.
+ * language tag mapped back to the URL Keycloak gave us. Each is labelled as on Keycloak's own page.
  */
 function localeSwitcher(kcContext: KcContext, i18n: I18n): TemplateResult | null {
-  const languages = i18n.enabledLanguages;
+  const { locale } = kcContext;
 
-  if (!kcContext.realm.internationalizationEnabled || languages.length < 2) {
+  if (!kcContext.realm.internationalizationEnabled || locale === undefined || locale.supported.length < 2) {
     return null;
   }
 
-  // Keyed as plain strings: languageTag is a union of the 30 tags Keycloak ships, but what
-  // comes back off the select is whatever string it holds.
-  const hrefByTag = new Map<string, string>(
-    languages.map(language => [language.languageTag, language.href])
-  );
+  const hrefByTag = new Map(locale.supported.map(language => [language.languageTag, language.url]));
 
   const navigate = (event: Event): void => {
     const href = hrefByTag.get((event.currentTarget as { value?: string }).value ?? "");
@@ -175,8 +171,8 @@ function localeSwitcher(kcContext: KcContext, i18n: I18n): TemplateResult | null
       class="or-locale"
       id="kc-locale"
       accessible-name=${i18n.msgStr("languages")}
-      .items=${languages.map(language => ({ label: language.label, value: language.languageTag }))}
-      .value=${i18n.currentLanguage.languageTag}
+      .items=${locale.supported.map(language => ({ label: language.label, value: language.languageTag }))}
+      .value=${locale.currentLanguageTag}
       @change=${navigate}
     ></or-vaadin-select>
   `;
@@ -388,9 +384,8 @@ export function usernameLabel(
  *
  * On a real Keycloak the server resolves it: Keycloakify's generated template looks up every
  * key-shaped string in the context with Keycloak's own msg() and passes the result in
- * `x-keycloakify.messages`, which advancedMsgStr checks first, so this works for headers
- * Keycloakify's bundled messages lack, such as accountUpdatedTitle. It only fails for a key the
- * server has no message for either. advancedMsgStr returns such a key unchanged, which is the
+ * `x-keycloakify.messages`, which advancedMsgStr reads. It only fails for a key the server has
+ * no message for. advancedMsgStr returns such a key unchanged, which is the
  * only signal available, so that becomes undefined here, and each page says what it would
  * rather show than a key.
  */

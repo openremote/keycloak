@@ -1,6 +1,6 @@
 import { render } from "lit";
 import type { KcContext } from "./login/KcContext";
-import { getI18n } from "./i18n";
+import { getI18n, languageTag } from "./i18n";
 import { pages } from "./page-registry";
 
 export type ThemeOverride = "light" | "dark" | null;
@@ -60,24 +60,9 @@ export function renderPage(kcContext: KcContext, root: HTMLElement): void {
     );
   }
 
-  /*
-   * The first render already has every message Keycloak resolved for the page, in the user's
-   * language (see theme/build.gradle). Anything else falls back to Keycloakify's bundled copy:
-   * English at first, then, for any other language, the bundle fetched for it, at which point
-   * we render again. Lit diffs, so that second pass only touches the strings that changed.
-   *
-   * prI18n_currentLanguage is undefined when there is nothing to wait for: English, or a
-   * realm with internationalization off, which is the common case. It rejects for a language
-   * Keycloak translates and Keycloakify has no bundle for, and then the first render stays.
-   */
-  const { i18n, prI18n_currentLanguage } = getI18n({ kcContext });
+  // As Keycloak's own template sets them: the page is in the language its messages are in.
+  document.documentElement.lang = languageTag(kcContext);
+  document.documentElement.dir = kcContext.locale?.rtl ? "rtl" : "ltr";
 
-  render(page(kcContext, i18n), root);
-
-  void prI18n_currentLanguage?.then(
-    translated => {
-      render(page(kcContext, translated), root);
-    },
-    () => undefined
-  );
+  render(page(kcContext, getI18n(kcContext)), root);
 }

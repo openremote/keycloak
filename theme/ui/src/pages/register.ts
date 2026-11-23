@@ -70,7 +70,7 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
   return layout({
     kcContext,
     i18n,
-    /* A key, resolved: if the bundle does not have it, the page's own title rather than the
+    /* A key, resolved: if Keycloak has no message for it, the page's own title rather than the
        key itself. See the longer note in info.ts, where that gap actually bites. */
     heading: resolvedHeading(messageHeader, advancedMsgStr) ?? msgStr("registerTitle"),
     /* Keycloak's own register.ftl uses exactly this: every field renders its own error, and

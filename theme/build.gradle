@@ -140,8 +140,7 @@ tasks.register('unpackLoginTheme', Sync) {
 
         /*
          * Keycloak resolves each key with the lookup Keycloakify uses for those in kcContext, which
-         * skips a key Keycloak has no message for. The page's i18n checks what it resolved before
-         * Keycloakify's bundled copy, which is what the page fell back to for these keys.
+         * skips a key Keycloak has no message for. What it resolves is all the page's i18n reads.
          */
         def lookup = "<#list ${groovy.json.JsonOutput.toJson(keys)} as key>" +
                 '<@addToXKeycloakifyMessagesIfMessageKey str=key /></#list>'

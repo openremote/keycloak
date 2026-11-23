@@ -197,7 +197,7 @@ Run these against at least `login`, `register` and `login-config-totp` — the s
 
 - **Branding.** A realm with its own `manager_config.json` shows its logo, application title, brand color **and favicon**, with no flash of stock OpenRemote branding first. A realm with no entry falls back cleanly. A config using the legacy `--or-app-color4` brands correctly.
 - **Dark mode.** Every page in `prefers-color-scheme: dark`, including the alert colors and the 2FA QR code, which needs a light backdrop to stay scannable.
-- **Translations.** Switch to a non-English language: the whole page changes, including anything this theme adds. Nothing shows a literal `«`. Check one right-to-left language for layout.
+- **Translations.** Switch to a non-English language: the whole page changes, apart from those of this theme's own few messages (`OWN_MESSAGES` in `theme/ui/src/i18n.ts`) with no translation there, which stay English. Nothing shows a literal `«`. Check one right-to-left language for layout.
 - **Narrow screens.** 320px wide: nothing clipped, and the language switcher does not sit on top of the logo.
 - **Inherited pages.** Spot-check a page this theme does *not* implement, e.g. `select-authenticator` or `terms` — those come from Keycloak's own theme and must still work.
 

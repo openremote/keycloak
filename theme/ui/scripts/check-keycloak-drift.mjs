@@ -50,13 +50,6 @@ const THEMES = ["base", parentTheme()];
 const SHARED_TEMPLATES = ["template.ftl", "user-profile-commons.ftl"];
 
 /*
- * Keys this theme names that Keycloak has never defined. `languages` is the locale switcher's
- * accessible name, which Keycloak's own template.ftl asks for too, so naming it is right even
- * though only Keycloakify's bundle resolves it.
- */
-const UNDEFINED_UPSTREAM = new Set(["languages"]);
-
-/*
  * Keys Keycloak's version of one of our pages names that this theme deliberately does not. A control
  * upstream relabelled fails below; an entry here is how a decision not to follow it is recorded,
  * in the diff rather than in someone's memory, with the reason beside it.
@@ -398,20 +391,19 @@ function keycloakMessages(root) {
 const TOKEN = /(?<comment>\/\/[^\n]*|\/\*[\s\S]*?\*\/)|(?<quote>["'`])(?<string>(?:\\[\s\S]|(?!\k<quote>)[^\\])*)\k<quote>|(?<word>\w+)|\S/g;
 
 /**
- * The keys of an object in i18n.ts, found by what opens it: `KEYCLOAK_STAND_INS =` for one of the
- * message objects, whose keys are at depth 1, or `withCustomTranslations(` for the keys the call
- * declares itself, at depth 2, inside a language tag.
+ * The keys of an object declared in i18n.ts as `name = {`.
  *
  * Read from its tokens rather than by matching indentation, so reformatting that file cannot
  * quietly turn this into an empty list, and a comment that writes the code out is not taken for
  * it. A key is the string or word a property opens with, so the prose after it cannot name one.
  */
-function objectKeys(opener, keyDepth) {
+function objectKeys(name) {
   const tokens = i18nTokens();
+  const opener = [name, "="];
   const start = tokens.findIndex((_, i) => opener.every((text, j) => tokens[i + j]?.[0] === text));
 
   if (start === -1) {
-    throw new Error(`No \`${opener.join(" ")}\` in src/i18n.ts`);
+    throw new Error(`No \`${name} =\` in src/i18n.ts`);
   }
 
   const keys = [];
@@ -424,7 +416,7 @@ function objectKeys(opener, keyDepth) {
       depth++;
     } else if (text === "}" && --depth === 0) {
       break;
-    } else if (text === ":" && depth === keyDepth && ["{", ","].includes(tokens[i - 2][0])) {
+    } else if (text === ":" && depth === 1 && ["{", ","].includes(tokens[i - 2][0])) {
       keys.push(tokens[i - 1].groups.string ?? tokens[i - 1].groups.word);
     }
   }
@@ -528,11 +520,8 @@ const messages = keycloakMessages(root);
 /* Each key to the files that name it, from the repository root, so the report can say where to change one. */
 const uses = new Map([...messageKeyUses()].map(([key, files]) => [key, new Set([...files].map(repoPath))]));
 const requested = [...uses.keys()].sort();
-const keycloakStandIns = objectKeys(["KEYCLOAK_STAND_INS", "="], 1);
-const ownMessages = objectKeys(["OWN_MESSAGES", "="], 1);
-const ourKeys = [...keycloakStandIns, ...ownMessages];
+const ownMessages = objectKeys("OWN_MESSAGES");
 const decorated = decoratedLinkKeys();
-const keycloakifyMessages = (await import("keycloakify/login/i18n/messages_defaultSet/en.js")).default;
 
 /* Keycloak's own versions of the pages we implement, and every macro behind them. */
 const counterparts = asServed(root, pages);
@@ -547,60 +536,20 @@ for (const page of pages) {
 }
 
 for (const key of requested) {
-  if (!messages.has(key) && !UNDEFINED_UPSTREAM.has(key) && !ourKeys.includes(key)) {
+  if (!messages.has(key) && !ownMessages.includes(key)) {
     problems.push(
-      `Message key "${key}" is not defined by Keycloak ${version}. It still type-checks, ` +
-        "because the types come from Keycloakify's copy, but nothing on the server resolves it."
+      `Message key "${key}" is not defined by Keycloak ${version}, so the page shows the key itself. If ` +
+        "Keycloak renamed it, follow the rename. If Keycloak never had one, add it to OWN_MESSAGES in src/i18n.ts."
     );
   }
 }
 
-for (const key of UNDEFINED_UPSTREAM) {
-  if (messages.has(key)) {
-    problems.push(`Keycloak ${version} defines "${key}" now, so drop it from UNDEFINED_UPSTREAM in ${SCRIPT}.`);
-  }
-}
-
-/* A key the call declares itself is in neither object, so nothing here would say when it can go. */
-for (const key of objectKeys(["withCustomTranslations", "("], 2)) {
-  problems.push(
-    `withCustomTranslations in src/i18n.ts declares "${key}" itself. Put it in KEYCLOAK_STAND_INS or ` +
-      "OWN_MESSAGES, so this check knows which it is."
-  );
-}
-
-/*
- * A stand-in is one of Keycloak's messages that Keycloakify's bundled set lacks. Keycloak resolves it
- * on the page like any other key; ours gives the key its type, which comes from Keycloakify's set,
- * so once that has the key, ours is only a stale copy.
- */
-for (const key of keycloakStandIns) {
-  if (!messages.has(key)) {
-    problems.push(
-      `KEYCLOAK_STAND_INS in src/i18n.ts lists "${key}", which Keycloak ${version} does not define. ` +
-        "If Keycloak renamed it, follow the rename. If it is a message of our own, move it to OWN_MESSAGES."
-    );
-  } else if (Object.hasOwn(keycloakifyMessages, key)) {
-    problems.push(
-      `src/i18n.ts stands in for "${key}" only because Keycloakify's message set lacked it. It ships ` +
-        "it now, so delete ours from KEYCLOAK_STAND_INS."
-    );
-  }
-}
-
-/*
- * Ours is a message under a key that only we define. Once Keycloak defines it, Keycloak's message
- * shows in place of ours; once Keycloakify does, ours hides its translations.
- */
+/* Ours is a message under a key that only we define. Once Keycloak defines it, its message shows instead. */
 for (const key of ownMessages) {
-  if (messages.has(key) || Object.hasOwn(keycloakifyMessages, key)) {
-    const consequence = messages.has(key)
-      ? `Keycloak ${version} defines now, so its message shows in place of ours`
-      : "Keycloakify defines now, and ours hides its translations";
-
+  if (messages.has(key)) {
     problems.push(
-      `OWN_MESSAGES in src/i18n.ts lists "${key}", which ${consequence}. If it means the same, move it to ` +
-        "KEYCLOAK_STAND_INS with Keycloak's English while Keycloakify lacks it, or drop it. Otherwise rename ours."
+      `OWN_MESSAGES in src/i18n.ts lists "${key}", which Keycloak ${version} defines now, so its message ` +
+        "shows in place of ours. If it means the same, drop ours. Otherwise rename ours."
     );
   }
 }
@@ -610,7 +559,7 @@ for (const key of ownMessages) {
  * when Keycloak renamed a link means the page, moved to the new key, shows two chevrons.
  */
 for (const key of decorated) {
-  if (!messages.has(key) && !ourKeys.includes(key)) {
+  if (!messages.has(key) && !ownMessages.includes(key)) {
     problems.push(
       `DECORATED_LINK_KEYS in src/i18n.ts lists "${key}", which Keycloak ${version} does not define. ` +
         "If Keycloak renamed that link, list its new key instead, or the page using it shows two chevrons. Otherwise drop it."
@@ -674,7 +623,6 @@ if (before === undefined) {
 const previousRoot = await themesRoot(before);
 const keycloakify = installedKeycloakify();
 const newer = newerKeycloakify(keycloakify);
-const I18N = repoPath(join(UI_DIR, "src", "i18n.ts"));
 
 /* Both versions, so a template imported in only one of them, or moved between themes, is watched. */
 const ours = [...pages, ...SHARED_TEMPLATES];
@@ -726,7 +674,7 @@ const newPages = [...new Set(appeared.filter(name => isPage(root, name)).map(nam
  * A control Keycloak relabelled: its own version of one of our pages names a key our theme does not.
  * Nothing above sees this, because the key we still name goes on resolving.
  */
-const named = new Set([...requested, ...ourKeys]);
+const named = new Set([...requested, ...ownMessages]);
 const upstreamBefore = templateMessageKeys(previousRoot, servedThen);
 const upstreamNow = templateMessageKeys(root, servedNow);
 const startedUsing = [...upstreamNow]
@@ -854,10 +802,6 @@ function whatChanged(change) {
   return `${did}, part of its ${series(change.pages.map(code))}`;
 }
 
-function inKeycloakify(key) {
-  return Object.hasOwn(keycloakifyMessages, key);
-}
-
 /*
  * Every failing key in one table: the keys Keycloak's version of our pages added that ours lacks,
  * beside those it removed that ours still uses, with the ids of the pages each one is on, a line each.
@@ -876,12 +820,11 @@ function failureTable() {
   ];
 
   return table([
-    ["Change", "Key", "English", `In Keycloakify ${keycloakify.version}`, "Pages"],
+    ["Change", "Key", "English", "Pages"],
     ...rows.map(([change, key, ids]) => [
       change,
       code(key),
       english(key),
-      inKeycloakify(key) ? "yes" : "no",
       ids.length === pages.length ? "every page" : ids.map(code).join("<br>")
     ])
   ]);
@@ -956,15 +899,7 @@ if (relabelled.length > 0 || unplaced.length > 0) {
     "",
     "Keycloak's version of our pages uses new message keys, for a control it relabelled or added, while our " +
       `theme does not. Use those keys on our pages or add them to \`UPSTREAM_ONLY\` in \`${SCRIPT}\`. A removed ` +
-      "key is one Keycloak dropped there that our page still uses, often the one a new key replaces." +
-      /*
-       * What adopting a key costs where the installed Keycloakify has no message for it: a stand-in
-       * in src/i18n.ts, for its type.
-       */
-      (startedUsing.some(key => !inKeycloakify(key))
-        ? ` A key not in Keycloakify also needs Keycloak's English in \`KEYCLOAK_STAND_INS\` in \`${I18N}\`, for ` +
-          "its type."
-        : ""),
+      "key is one Keycloak dropped there that our page still uses, often the one a new key replaces.",
     "",
     ...failureTable()
   ]);
@@ -1036,7 +971,7 @@ const group = (title, sections) => [
  * helps.
  */
 function keycloakifyLag() {
-  const intro = "Our pages take their types and dev-server mocks from Keycloakify, not from Keycloak.";
+  const intro = "Our pages take their types and dev-server mocks from Keycloakify.";
 
   if (newer.length === 0) {
     return [`${intro} ${keycloakify.version} is installed, the newest release.`];
@@ -1046,8 +981,8 @@ function keycloakifyLag() {
   const releases = newer.length === 1 ? "1 release" : `${newer.length} releases`;
 
   return [
-    `${intro} ${keycloakify.version} is installed, ${releases} behind the newest (${newest}). Where something below ` +
-      `is missing from ${keycloakify.version}, upgrade and run this check again to see whether ${newest} has it:`,
+    `${intro} ${keycloakify.version} is installed, ${releases} behind the newest (${newest}). Where a new page below ` +
+      `has no types or mock in ${keycloakify.version}, upgrade and run this check again to see whether ${newest} has them:`,
     "",
     "```sh",
     "yarn up keycloakify",

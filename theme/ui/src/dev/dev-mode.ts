@@ -9,6 +9,7 @@ import { render } from "lit";
 import { createGetKcContextMock } from "keycloakify/login/KcContext/getKcContextMock";
 import type { KcContext } from "../login/KcContext";
 import { reveal } from "../branding";
+import { languageTag } from "../i18n";
 import { implementedPageIds } from "../page-registry";
 import { applyTheme, readThemeOverride, renderPage } from "../render";
 import { applyChildTheme } from "./child-theme";
@@ -22,7 +23,7 @@ import {
   readSettings,
   togglesFor
 } from "./settings";
-import { fallbackView, keycloakMessages, renderStock, type StockVariant } from "./stock";
+import { contextMessageKeys, fallbackView, keycloakMessages, renderStock, type StockVariant } from "./stock";
 
 const { getKcContextMock } = createGetKcContextMock({
   kcContextExtension: { themeName: "openremote", properties: {} },
@@ -32,14 +33,8 @@ const { getKcContextMock } = createGetKcContextMock({
 /** Matches the realm used in the design, so the two line up when comparing. */
 const REALM_DISPLAY_NAME = "Manufacturer";
 
-/** The language a page renders in, by the rule Keycloakify's getI18n applies. */
-function languageOf(kcContext: KcContext): string {
-  if (!kcContext.realm.internationalizationEnabled) {
-    return "en";
-  }
-
-  return (kcContext as { locale?: { currentLanguageTag: string } }).locale?.currentLanguageTag ?? "en";
-}
+/** Hebrew, Arabic and the other right-to-left scripts' letters, as Unicode places them. */
+const RIGHT_TO_LEFT = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
 
 /**
  * Drives the page from mocks and switches pages without reloading the document.
@@ -59,9 +54,12 @@ export function runDevMode(root: HTMLElement): void {
   /** The context the page on screen was rendered from, for the flows' language switcher. */
   let rendered: KcContext | undefined;
 
-  /** Keycloak's messages for each page and language, once show() has fetched them. */
-  const resolved = new Map<string, Record<string, string>>();
+  /** Keycloak's messages for each page and language, and the keys asked for, once show() has fetched them. */
+  const resolved = new Map<string, { messages: Record<string, string>; asked: Set<string> }>();
   const resolvedKey = (pageId: string, language: string) => `${pageId}\n${language}`;
+
+  /** Keycloak's messages could not be fetched: render without them, and retry next time. */
+  let messagesUnavailable = false;
 
   /*
    * The page's mock, shaped for a given selection of settings.
@@ -75,13 +73,15 @@ export function runDevMode(root: HTMLElement): void {
 
     /*
      * The language the user picked from the switcher. Keycloak remembers it the same way across
-     * pages (a cookie there, a query parameter here), and getI18n fetches the bundle for it.
+     * pages (a cookie there, a query parameter here), and show() fetches Keycloak's messages in it.
      */
     const lang = currentLanguage();
-    const locale = (kcContext as { locale?: { currentLanguageTag: string } }).locale;
+    const locale = (kcContext as { locale?: { currentLanguageTag: string; rtl?: boolean } }).locale;
 
     if (lang !== null && locale !== undefined) {
       locale.currentLanguageTag = lang;
+      // As Keycloak decides it: by the direction of the language's own name in that language.
+      locale.rtl = RIGHT_TO_LEFT.test(new Intl.DisplayNames([lang], { type: "language" }).of(lang) ?? "");
     }
 
     /*
@@ -133,25 +133,16 @@ export function runDevMode(root: HTMLElement): void {
     }
 
     /*
-     * The info page's mock heads itself "<Message header>", a literal that is not a message key -
+     * The info page's mock heads itself "<Message header>", a literal that is not a message key,
      * so the harness showed a plausible heading while production showed the raw key
      * "accountUpdatedTitle". Keycloak sends a key here, and the one it sends after the
-     * update-password flow is exactly that, so use it.
-     *
-     * On a real Keycloak, Keycloakify's generated template resolves every key-shaped string in the
-     * context with the server's own msg() and hands the result over in
-     * `x-keycloakify.messages`, which the page's i18n checks first. That is how this key gets its
-     * text in production even though Keycloakify's bundled messages lack it. There is no server
-     * here, so supply what it would, in a fresh object: the mocks share theirs.
+     * update-password flow is exactly that, so use it. Keycloak resolves it as it does any
+     * key-shaped string in kcContext; see contextMessageKeys().
      */
     const info = kcContext as { messageHeader?: string };
 
     if (info.messageHeader !== undefined) {
       info.messageHeader = "accountUpdatedTitle";
-      kcContext["x-keycloakify"] = {
-        ...kcContext["x-keycloakify"],
-        messages: { ...kcContext["x-keycloakify"].messages, accountUpdatedTitle: "Account updated" }
-      };
     }
 
     /*
@@ -228,16 +219,14 @@ export function runDevMode(root: HTMLElement): void {
     applySettings(kcContext, settings);
 
     /*
-     * What Keycloak resolves for the keys the page names, merged in as its template would hand them
-     * over. After the settings, which decide the language. A fresh object: the mocks share theirs.
+     * What Keycloak resolves for the keys the page names and those kcContext carries, handed over
+     * as its template would. After the settings, which decide the language. A fresh object: the
+     * mocks share theirs.
      */
-    const messages = resolved.get(resolvedKey(pageId, languageOf(kcContext)));
+    const messages = resolved.get(resolvedKey(pageId, languageTag(kcContext)))?.messages;
 
     if (messages !== undefined) {
-      kcContext["x-keycloakify"] = {
-        ...kcContext["x-keycloakify"],
-        messages: { ...messages, ...kcContext["x-keycloakify"].messages }
-      };
+      kcContext["x-keycloakify"] = { ...kcContext["x-keycloakify"], messages };
     }
 
     /*
@@ -285,15 +274,28 @@ export function runDevMode(root: HTMLElement): void {
 
     /*
      * Keycloak's messages for the page before anything renders, so the page and every render
-     * effectiveToggles compares it with have the same ones. Once per page and language; the page
-     * on screen stays until they arrive.
+     * effectiveToggles compares it with have the same ones. Once per page and language, and again
+     * when a setting brings in a key kcContext did not carry before; the page on screen stays until
+     * they arrive.
      */
     const kcContext = buildContext(pageId, settings);
-    const language = languageOf(kcContext);
+    const cacheKey = resolvedKey(pageId, languageTag(kcContext));
+    const carried = implemented ? contextMessageKeys(kcContext) : [];
+    const known = resolved.get(cacheKey);
 
-    if (implemented && !resolved.has(resolvedKey(pageId, language))) {
-      void keycloakMessages(pageId, language).then(messages => {
-        resolved.set(resolvedKey(pageId, language), messages);
+    if (implemented && !messagesUnavailable && (known === undefined || carried.some(key => !known.asked.has(key)))) {
+      void keycloakMessages(pageId, languageTag(kcContext), carried).then(messages => {
+        const before = resolved.get(cacheKey);
+
+        if (messages === undefined) {
+          messagesUnavailable = true;
+        } else {
+          // Merged with what arrived meanwhile, rather than with what was known when this was sent.
+          resolved.set(cacheKey, {
+            messages: { ...before?.messages, ...messages },
+            asked: new Set([...(before?.asked ?? []), ...carried])
+          });
+        }
 
         if (mine === generation) {
           show();
@@ -301,6 +303,8 @@ export function runDevMode(root: HTMLElement): void {
       });
       return;
     }
+
+    messagesUnavailable = false;
 
     applyTheme(readThemeOverride(location.search));
 

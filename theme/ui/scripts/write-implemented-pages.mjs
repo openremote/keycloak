@@ -16,12 +16,10 @@
  *
  * The keys are for Keycloak to resolve. Keycloakify's generated template already hands the page
  * every message Keycloak resolved for a key-shaped string in kcContext, in
- * `x-keycloakify.messages`, which the page's i18n checks before Keycloakify's bundled copy. The
- * keys a page names itself are not in kcContext, so they would come from that copy, which lags
- * Keycloak's wording and has fewer languages. theme/build.gradle adds a lookup for each to the
- * page's template, and Keycloak resolves them like the rest: in the user's language, with the
- * realm's own overrides. Per page rather than every key on every page, because each one is
- * written into the page itself.
+ * `x-keycloakify.messages`, which is all the page's i18n reads. The keys a page names itself are
+ * not in kcContext, so theme/build.gradle adds a lookup for each to the page's template, and
+ * Keycloak resolves them like the rest: in the user's language, with the realm's own overrides.
+ * Per page rather than every key on every page, because each one is written into the page itself.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";

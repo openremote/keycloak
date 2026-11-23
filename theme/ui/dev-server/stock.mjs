@@ -7,7 +7,7 @@
  *
  *   GET  /__stock/status                  what is installed, and its pages, or why nothing is
  *   POST /__stock/render                  {theme, pageId, locale, model, variants?} -> {url, changed}
- *   POST /__stock/messages                {pageId, locale} -> {messages}, for one of our own pages
+ *   POST /__stock/messages                {pageId, locale, keys} -> {messages}, for one of our own pages
  *   GET  /__stock/page/<id>               a rendered page
  *   GET  /__stock/resources/<theme>/...   that theme's resources, looked up through its parents
  *   GET  /__stock/resources/common/...    the resources every theme imports
@@ -335,8 +335,9 @@ export function stockKeycloak({ uiDir }) {
 
   /*
    * The messages Keycloak resolves for one of our pages: the keys it names, read from the source on
-   * every request so an edit shows, resolved through the theme it falls back to. Ours ships no
-   * messages of its own, so that is where Keycloak finds them too.
+   * every request so an edit shows, and those kcContext carries, which the page sends. Resolved
+   * through the theme it falls back to: ours ships no messages of its own, so that is where Keycloak
+   * finds them too.
    */
   const handleMessages = async (request, response) => {
     const current = status();
@@ -346,8 +347,8 @@ export function stockKeycloak({ uiDir }) {
       return;
     }
 
-    const { pageId, locale = "en" } = JSON.parse(await readBody(request));
-    const keys = pageMessageKeys().get(pageId) ?? [];
+    const { pageId, locale = "en", keys: carried = [] } = JSON.parse(await readBody(request));
+    const keys = [...new Set([...(pageMessageKeys().get(pageId) ?? []), ...carried])];
 
     try {
       const { messages } = await ask({ theme: current.fallbackTheme, locale, messages: keys });

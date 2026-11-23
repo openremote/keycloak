@@ -13,9 +13,8 @@ Work from the link you were given: node ids change when the file is reorganized,
 ## Messages
 
 - Do not override Keycloak's wording, in any language. Use the key Keycloak's own template uses for the same control, even where another key reads closer to the design.
-- Keycloak resolves every key a page names as a literal (`msgStr("doLogIn")`), while it renders the page: `theme/build.gradle` adds a lookup for each to the page's template, from the scan in `scripts/message-keys.mjs`. A key built at runtime is not on that list, so it falls back to Keycloakify's bundled copy unless it arrives in kcContext. The jar ships no messages of its own, so a child theme's `messages_*.properties` and a realm's localization overrides reach every one.
-- `withCustomTranslations` is only for keys Keycloakify's bundled message set has no message for: ones Keycloak has none for either (`OWN_MESSAGES` in `src/i18n.ts`), and Keycloak's own keys Keycloakify has yet to ship, copied verbatim (`KEYCLOAK_STAND_INS`), which give the key its type. `yarn check-keycloak` fails once Keycloakify ships one. Its `en` block is the fallback for every language, so our own messages show in English in every locale.
-- Messages the server resolved take precedence over custom translations, so a client-side override does not reach them.
+- Keycloak resolves every message a page shows, while it renders the page, and nothing in the browser translates. `theme/build.gradle` adds a lookup for each key a page names as a literal (`msgStr("doLogIn")`), from the scan in `scripts/message-keys.mjs`, and Keycloakify's template does the same for key-shaped strings in kcContext. A key built at runtime from anything else is on neither list and shows as itself, so write it out: `msgStr(type === "hotp" ? "loginTotp.hotp" : "loginTotp.totp")`. The jar ships no messages of its own, so a child theme's `messages_*.properties` and a realm's localization overrides reach every one.
+- `OWN_MESSAGES` in `src/i18n.ts` is only for keys Keycloak has no message for. It shows in English wherever `OWN_TRANSLATIONS` has no entry for the language. `yarn check-keycloak` fails once Keycloak defines one.
 - Keycloak sends message keys for anything a realm can configure (user-profile labels, `totp.supportedApplications`, admin messages). Resolve them with `advancedMsgStr`.
 
 ## Vaadin components
