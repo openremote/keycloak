@@ -25,8 +25,9 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
 
   /*
    * requiredActions are Keycloak's own action names (UPDATE_PASSWORD, CONFIGURE_TOTP, ...),
-   * which resolve through the message bundle. advancedMsgStr rather than msgStr because the
-   * key is built at runtime and a realm may have an action we do not know about.
+   * whose labels Keycloakify's template has Keycloak resolve, as `requiredAction.<name>`.
+   * advancedMsgStr rather than msgStr because the key is built at runtime and a realm may have
+   * an action we do not know about.
    */
   const actions = requiredActions
     ?.map(action => advancedMsgStr(`requiredAction.${action}`))

@@ -1,76 +1,78 @@
-import { i18nBuilder } from "keycloakify/login/i18n/noJsx";
+import type { KcContext } from "./login/KcContext";
 
 /*
  * Translations.
  *
- * Keycloakify ships Keycloak's own message bundle for every language Keycloak translates, and
- * fetches the right one at runtime, so pages address strings by Keycloak's message keys rather
- * than by literal English and a realm with internationalization on is translated for free.
- *
- * The `noJsx` entry point is what makes this usable here: Keycloakify's i18n is otherwise a
- * React hook, but it also ships a plain function API, so a Lit theme gets the whole message
- * set for free.
+ * Pages address strings by Keycloak's message keys rather than by literal English, and Keycloak
+ * resolves them while it renders the page, in the user's language and with the realm's overrides:
+ * theme/build.gradle adds a lookup to each page's template for the keys the page names, as
+ * Keycloakify's template already does for those kcContext carries. They arrive in
+ * `x-keycloakify.messages`, and nothing else here translates. A key Keycloak has no message for
+ * shows as itself, as it does on Keycloak's own pages.
  *
  * The wording is Keycloak's, deliberately. Overriding a string only ever works in one language,
  * so every other locale keeps Keycloak's phrasing regardless, and it puts this theme in the
  * business of maintaining auth copy. If a string reads wrong it reads wrong in every language and
  * the fix belongs upstream.
  *
- * What is left below is the two things that are not wording choices: keys Keycloakify's bundled
- * message set has no message for, and a decoration the design draws in CSS instead. Nothing else
- * belongs here, not even a string that reads wrong.
+ * What is left below is the two things that are not wording choices: messages for keys Keycloak
+ * has none for, and a decoration the design draws in CSS instead. Nothing else belongs here, not
+ * even a string that reads wrong.
  */
 
 /*
- * Keys the browser has no message for, because Keycloakify's bundled message set lacks them:
- * ones Keycloak has no translation for in any language either, and Keycloak's own keys that
- * Keycloakify has yet to ship, copied verbatim, without which the control renders blank. The
- * Keycloak check fails once Keycloakify ships one of those, so it does not outstay its reason.
- *
- * English is the only thing we can fall back to. `withCustomTranslations` is the right home for
- * exactly these: getI18n uses the block for the current language if there is one and the `en`
- * block otherwise, which means anything put here leaks into every locale. Adding a language block
- * below translates them.
+ * Messages of our own, for what Keycloak has no message for, in English wherever OWN_TRANSLATIONS
+ * has none. The Keycloak check fails if Keycloak starts to define one: its message then shows
+ * instead.
  */
-const { getI18n: getI18n_base, ofTypeI18n } = i18nBuilder
-  .withThemeName<"openremote">()
-  .withCustomTranslations({
-    en: {
-      // Both of these are additions to Keycloak's own login-otp.ftl, which offers no way back
-      // and gives its list of devices no label at all, so there is no key to reuse.
-      backToLoginCredentials: "Back to login credentials",
-      select2faDevice: "Select your 2FA device",
-      /*
-       * Not ours: this is Keycloak's own string, verbatim, capital O and all
-       * (26.7 messages_en.properties line 18). It is here only because Keycloakify's bundled
-       * copy of the message set predates it, so removing this line blanks the button rather
-       * than falling back to Keycloak's wording. Delete it once Keycloakify catches up.
-       */
-      doSwitchOrganization: "Switch Organization",
-      /*
-       * Keycloak's own string too (26.7 messages_en.properties), for the same reason: its
-       * error page prints the trace identifier support asks for, and Keycloakify's bundled
-       * message set predates the key. Only ever shown when tracing is enabled on the server.
-       */
-      traceIdSupportMessage:
-        "If you contact support, please provide the following trace identifier: {0}",
-      /*
-       * Keycloak's own strings as well (26.7 messages_en.properties lines 175 to 177), for the
-       * same reason: the verify-email page Keycloak shows an application-initiated action
-       * names them, and Keycloakify's bundled message set predates them.
-       */
-      emailVerifyInstruction4:
-        "To verify your email address, we are about to send you email with instructions to the address {0}.",
-      emailVerifyResend: "Re-send verification email",
-      emailVerifySend: "Send verification email",
-      // Fallback label for an OTP credential the user saved without naming it. Keycloak's own
-      // template renders the blank label as-is, giving a radio with no accessible name.
-      otpDeviceFallback: "Device {0}"
-    }
-  })
-  .build();
+const OWN_MESSAGES = {
+  // Additions to Keycloak's login-otp.ftl, which offers no way back and gives its list of devices
+  // no label.
+  backToLoginCredentials: "Back to login credentials",
+  select2faDevice: "Select your 2FA device",
+  // An OTP credential the user saved without naming it. Keycloak's own template renders the blank
+  // label as it is, giving a radio with no accessible name.
+  otpDeviceFallback: "Device {0}",
+  // The language switcher's accessible name. Keycloak's own template asks for this key too, but has
+  // no message for it, so screen readers there hear the key.
+  languages: "Languages"
+};
 
-export type I18n = typeof ofTypeI18n;
+/*
+ * Our messages in other languages, by language tag. The switcher's accessible name only, copied
+ * from Keycloakify's bundled messages, which translated it for these.
+ */
+const OWN_TRANSLATIONS: Record<string, Partial<Record<keyof typeof OWN_MESSAGES, string>>> = {
+  ar: { languages: "اللغات" },
+  ca: { languages: "Idiomes" },
+  cs: { languages: "Jazyky" },
+  da: { languages: "Sprog" },
+  de: { languages: "Sprachen" },
+  el: { languages: "Γλώσσες" },
+  es: { languages: "Idiomas" },
+  fa: { languages: "زبان‌ها" },
+  fi: { languages: "Kielet" },
+  fr: { languages: "Langues" },
+  hu: { languages: "Nyelvek" },
+  it: { languages: "Lingue" },
+  ja: { languages: "言語" },
+  ka: { languages: "ენები" },
+  lt: { languages: "Kalbos" },
+  lv: { languages: "Valodas" },
+  nl: { languages: "Talen" },
+  no: { languages: "Språk" },
+  pl: { languages: "Języki" },
+  pt: { languages: "Idiomas" },
+  "pt-BR": { languages: "Idiomas" },
+  ru: { languages: "Языки" },
+  sk: { languages: "Jazyky" },
+  sv: { languages: "Språk" },
+  th: { languages: "ภาษา" },
+  tr: { languages: "Diller" },
+  uk: { languages: "Мови" },
+  "zh-CN": { languages: "语言" },
+  "zh-TW": { languages: "語言" }
+};
 
 /*
  * Keycloak decorates its navigation links with a literal "«" or "»" in *every* language, and
@@ -92,27 +94,44 @@ const DECORATED_LINK_KEYS = new Set([
 
 const LEADING_CHEVRON = /^\s*(?:&laquo;|&raquo;|«|»)\s*/;
 
-function localize(i18n: I18n): I18n {
-  const undecorate = (key: string, message: string): string =>
-    DECORATED_LINK_KEYS.has(key) ? message.replace(LEADING_CHEVRON, "") : message;
+type Args = (string | undefined)[];
 
-  return {
-    ...i18n,
-    msgStr: (key, ...args) => undecorate(key, i18n.msgStr(key, ...args)),
-    advancedMsgStr: (key, ...args) =>
-      // advancedMsgStr takes keys that may arrive wrapped as "${key}" from kcContext.
-      undecorate(/^\$\{(.+)\}$/.exec(key)?.[1] ?? key, i18n.advancedMsgStr(key, ...args))
-  };
+export type I18n = {
+  /** The message for a key the page names, with `{0}`, `{1}`, ... filled in from `args`. */
+  msgStr: (key: string, ...args: Args) => string;
+  /**
+   * The same for a string that came from kcContext, which is a key, a key wrapped as "${key}", or
+   * text a realm configured, shown as it is.
+   */
+  advancedMsgStr: (key: string, ...args: Args) => string;
+};
+
+/** The language Keycloak renders a page in: English unless the realm has internationalization on. */
+export function languageTag(kcContext: KcContext): string {
+  return (kcContext.realm.internationalizationEnabled && kcContext.locale?.currentLanguageTag) || "en";
 }
 
-export function getI18n(params: Parameters<typeof getI18n_base>[0]): {
-  i18n: I18n;
-  prI18n_currentLanguage: Promise<I18n> | undefined;
-} {
-  const { i18n, prI18n_currentLanguage } = getI18n_base(params);
+export function getI18n(kcContext: KcContext): I18n {
+  const language = languageTag(kcContext);
+  // A regional variant Keycloak has no translation of its own for, such as de-CH, takes its language's.
+  const own = { ...OWN_MESSAGES, ...(OWN_TRANSLATIONS[language] ?? OWN_TRANSLATIONS[language.split("-")[0]]) };
+  const sources: Record<string, string>[] = [kcContext["x-keycloakify"].messages, own];
+  const lookup = (key: string) => sources.find(messages => Object.hasOwn(messages, key))?.[key];
+
+  // In one pass, so an argument is inserted as it is: not read for `$&`, nor for another `{1}`.
+  const format = (key: string, message: string, args: Args) => {
+    const filled = message.replace(/\{(\d+)\}/g, (placeholder, i: string) => args[Number(i)] ?? placeholder);
+
+    return DECORATED_LINK_KEYS.has(key) ? filled.replace(LEADING_CHEVRON, "") : filled;
+  };
 
   return {
-    i18n: localize(i18n),
-    prI18n_currentLanguage: prI18n_currentLanguage?.then(localize)
+    msgStr: (key, ...args) => format(key, lookup(key) ?? key, args),
+    advancedMsgStr: (text, ...args) => {
+      const key = /^\$\{(.+)\}$/.exec(text)?.[1] ?? text;
+      const message = lookup(key);
+
+      return message === undefined ? text : format(key, message, args);
+    }
   };
 }

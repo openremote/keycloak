@@ -17,20 +17,23 @@ import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { implementedPages } from "./implemented-pages.mjs";
+import { implementedPageFiles } from "./implemented-pages.mjs";
+import { keyArgument, keyLiterals, messageKeyUses } from "./message-keys.mjs";
 
 const UI_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO_ROOT = resolve(UI_DIR, "..", "..");
 const CACHE_DIR = join(UI_DIR, ".keycloak-cache");
 
-/* Maven Central, or the job would sit on a stalled read until CI's own limit cut it off. */
+/* Maven Central and npm, or the job would sit on a stalled read until CI's own limit cut it off. */
 const DOWNLOAD_TIMEOUT_MS = 60_000;
 
-/*
- * Where the lists below live, so a failure cleared by editing one says where to go. With `/` on
- * Windows too, like every other path the report prints.
- */
-const SCRIPT = relative(REPO_ROOT, fileURLToPath(import.meta.url)).replaceAll("\\", "/");
+/* A path as the report prints it: from the repository's root, with `/` on Windows too. */
+function repoPath(path) {
+  return relative(REPO_ROOT, path).replaceAll("\\", "/");
+}
+
+/* Where the lists below live, so a failure cleared by editing one says where to go. */
+const SCRIPT = repoPath(fileURLToPath(import.meta.url));
 
 /*
  * What `./gradlew installDist` unpacks for the dev server's stock pages. Reused when it is
@@ -47,14 +50,7 @@ const THEMES = ["base", parentTheme()];
 const SHARED_TEMPLATES = ["template.ftl", "user-profile-commons.ftl"];
 
 /*
- * Keys this theme names that Keycloak has never defined. `languages` is the locale switcher's
- * accessible name, which Keycloak's own template.ftl asks for too, so naming it is right even
- * though only Keycloakify's bundle resolves it.
- */
-const UNDEFINED_UPSTREAM = new Set(["languages"]);
-
-/*
- * Keys Keycloak names behind one of our pages that this theme deliberately does not. A control
+ * Keys Keycloak's version of one of our pages names that this theme deliberately does not. A control
  * upstream relabelled fails below; an entry here is how a decision not to follow it is recorded,
  * in the diff rather than in someone's memory, with the reason beside it.
  *
@@ -301,13 +297,17 @@ function withImports(root, names) {
     }
 
     seen.add(name);
-
-    for (const match of source.matchAll(/<#import\s+"([^"]+\.ftl)"/g)) {
-      queue.push(...asServed(root, [match[1].replace(/^.*\//, "")]));
-    }
+    queue.push(...directImports(root, name));
   }
 
   return [...seen];
+}
+
+/* What one template `<#import>`s, each import resolved as withImports resolves it. */
+function directImports(root, name) {
+  return [...(templateText(root, name) ?? "").matchAll(/<#import\s+"([^"]+\.ftl)"/g)].flatMap(match =>
+    asServed(root, [match[1].replace(/^.*\//, "")])
+  );
 }
 
 /*
@@ -327,7 +327,7 @@ function isPage(root, name) {
  *   - `<@buttons.button label="doSubmit"/>`, where the macro resolves it: `${msg(label)}`. That is
  *     how the buttons on most of the pages we implement are written.
  *
- * The literals in the key argument, read by keyLiterals as requestedMessageKeys reads ours, so
+ * The literals in the key argument, read by keyLiterals as messageKeyUses reads ours, so
  * `msg(prefix + '.' + option)` in user-profile-commons.ftl names no key. A space before `label`
  * rather than a word boundary, which would take `aria-label` with it, and no `$` in a value, because
  * an interpolated one is not a key until FreeMarker has resolved it.
@@ -384,88 +384,6 @@ function keycloakMessages(root) {
 }
 
 /*
- * Keys this theme names. The literals in the key argument rather than only one straight after the
- * paren, because a page may choose between two keys and both are rendered somewhere:
- * `msgStr(realm.duplicateEmailsAllowed ? "emailInstructionUsername" : "emailInstruction")`.
- *
- * The key argument alone: what follows it are values interpolated into the message, and a literal
- * among those is not a key. In any of the three quotes, because `msgStr('doLogIn')` type-checks as
- * well and no formatter here rewrites it to double quotes. A key assembled at runtime, which
- * includes a template literal with a `${}` in it, is not a literal and cannot be checked here,
- * which is what advancedMsgStr is for.
- */
-function requestedMessageKeys() {
-  const keys = new Set();
-
-  for (const file of sourceFiles(join(UI_DIR, "src"))) {
-    const source = readFileSync(file, "utf8");
-
-    for (const call of source.matchAll(/\b(?:msgStr|advancedMsgStr)\(/g)) {
-      const argument = keyArgument(source, call.index + call[0].length);
-
-      for (const key of keyLiterals(argument, /(["'`])(?<key>[^"'`$]+)\1/g)) {
-        keys.add(key);
-      }
-    }
-  }
-
-  return [...keys].sort();
-}
-
-/*
- * The literals in a key argument that are keys, matched by `literal` into its `key` group.
- *
- * One that is compared against is not: `msgStr(kind === "otp" ? "a" : "b")` names a and b. Nor is
- * one concatenated with something: `msg(prefix + '.' + option)` assembles its key at runtime, and
- * the `.` is no more a key than the prefix is.
- */
-function keyLiterals(argument, literal) {
-  const keys = [];
-
-  for (const match of argument.matchAll(literal)) {
-    const before = argument.slice(0, match.index);
-    const after = argument.slice(match.index + match[0].length);
-
-    if (!/(?:[=!]==?|\+)\s*$/.test(before) && !/^\s*(?:[=!]==?|\+)/.test(after)) {
-      keys.push(match.groups.key);
-    }
-  }
-
-  return keys;
-}
-
-/*
- * The first argument of the call whose parenthesis `start` follows: up to the comma that ends it,
- * nested calls and their commas included, so a key chosen inside one is part of it.
- */
-function keyArgument(source, start) {
-  let depth = 0;
-
-  for (let i = start; i < source.length; i++) {
-    const character = source[i];
-
-    if (depth === 0 && (character === "," || character === ")")) {
-      return source.slice(start, i);
-    }
-
-    if ("([{".includes(character)) {
-      depth++;
-    } else if (")]}".includes(character)) {
-      depth--;
-    }
-  }
-
-  return source.slice(start);
-}
-
-function sourceFiles(dir) {
-  // src/dev never ships, and its strings are the harness's own.
-  return readdirSync(dir, { recursive: true })
-    .filter(path => path.endsWith(".ts") && !/^dev[\\/]/.test(path))
-    .map(path => join(dir, path));
-}
-
-/*
  * One token of TypeScript, close enough to read i18n.ts by: a comment, a string, a word, or any
  * other character but whitespace. Read whole, a URL inside a message does not start a comment, and
  * a brace or a colon inside one is not structure.
@@ -473,35 +391,32 @@ function sourceFiles(dir) {
 const TOKEN = /(?<comment>\/\/[^\n]*|\/\*[\s\S]*?\*\/)|(?<quote>["'`])(?<string>(?:\\[\s\S]|(?!\k<quote>)[^\\])*)\k<quote>|(?<word>\w+)|\S/g;
 
 /**
- * The keys declared in i18n.ts's withCustomTranslations block.
+ * The keys of an object declared in i18n.ts as `name = {`.
  *
  * Read from its tokens rather than by matching indentation, so reformatting that file cannot
- * quietly turn this into an empty list, and a comment that writes the call out is not taken for
- * it. Depth 2 is a message key: depth 1 is the argument, whose own keys are the language tags the
- * block is organized by. A key is the string or word a property opens with, so the prose after it
- * cannot name one.
+ * quietly turn this into an empty list, and a comment that writes the code out is not taken for
+ * it. A key is the string or word a property opens with, so the prose after it cannot name one.
  */
-function customTranslationKeys() {
+function objectKeys(name) {
   const tokens = i18nTokens();
-  const start = tokens.findIndex(
-    (token, i) => token.groups.word === "withCustomTranslations" && tokens[i + 1]?.[0] === "("
-  );
+  const opener = [name, "="];
+  const start = tokens.findIndex((_, i) => opener.every((text, j) => tokens[i + j]?.[0] === text));
 
   if (start === -1) {
-    throw new Error("No withCustomTranslations call in src/i18n.ts");
+    throw new Error(`No \`${name} =\` in src/i18n.ts`);
   }
 
   const keys = [];
   let depth = 0;
 
-  for (let i = start + 2; i < tokens.length; i++) {
+  for (let i = start + opener.length; i < tokens.length; i++) {
     const text = tokens[i][0];
 
     if (text === "{") {
       depth++;
     } else if (text === "}" && --depth === 0) {
       break;
-    } else if (text === ":" && depth === 2 && ["{", ","].includes(tokens[i - 2][0])) {
+    } else if (text === ":" && depth === 1 && ["{", ","].includes(tokens[i - 2][0])) {
       keys.push(tokens[i - 1].groups.string ?? tokens[i - 1].groups.word);
     }
   }
@@ -551,6 +466,41 @@ function installedKeycloakify() {
   };
 }
 
+/*
+ * The Keycloakify releases newer than the installed one, oldest first, including those Yarn's
+ * npmMinimalAgeGate still holds back, which `npm info` does not apply: one of them may have what an
+ * upgrade needs. Asked of Yarn, so the registry, credentials and proxy in .yarnrc.yml apply.
+ */
+function newerKeycloakify(installed) {
+  const yarnPath = /^yarnPath:\s*(\S+)\s*$/m.exec(readFileSync(join(UI_DIR, ".yarnrc.yml"), "utf8"))?.[1];
+
+  if (yarnPath === undefined) {
+    throw new Error("No `yarnPath` in theme/ui/.yarnrc.yml, which the report runs Yarn by.");
+  }
+
+  const yarn = (...args) =>
+    JSON.parse(
+      execFileSync(process.execPath, [join(UI_DIR, yarnPath), ...args, "--json"], {
+        cwd: UI_DIR,
+        encoding: "utf8",
+        stdio: "pipe",
+        timeout: DOWNLOAD_TIMEOUT_MS
+      })
+    );
+  const { versions } = yarn("npm", "info", "keycloakify", "--fields", "versions");
+
+  return versions
+    .filter(release => /^\d+\.\d+\.\d+$/.test(release) && compareVersions(release, installed.version) > 0)
+    .sort(compareVersions);
+}
+
+/* Two releases in order, by their major, minor and patch numbers. */
+function compareVersions(a, b) {
+  const [x, y] = [a, b].map(release => release.split(".").map(part => parseInt(part, 10)));
+
+  return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+}
+
 const version = pinnedVersion(readFileSync(join(REPO_ROOT, "Dockerfile"), "utf8"));
 const root = await themesRoot(version);
 
@@ -563,13 +513,15 @@ for (const theme of THEMES) {
   }
 }
 
-const pages = implementedPages();
+const pageFiles = implementedPageFiles();
+const pages = [...pageFiles.keys()].sort();
 const names = new Set(templateNames(root));
 const messages = keycloakMessages(root);
-const requested = requestedMessageKeys();
-const ourKeys = customTranslationKeys();
+/* Each key to the files that name it, from the repository root, so the report can say where to change one. */
+const uses = new Map([...messageKeyUses()].map(([key, files]) => [key, new Set([...files].map(repoPath))]));
+const requested = [...uses.keys()].sort();
+const ownMessages = objectKeys("OWN_MESSAGES");
 const decorated = decoratedLinkKeys();
-const keycloakifyMessages = (await import("keycloakify/login/i18n/messages_defaultSet/en.js")).default;
 
 /* Keycloak's own versions of the pages we implement, and every macro behind them. */
 const counterparts = asServed(root, pages);
@@ -584,30 +536,20 @@ for (const page of pages) {
 }
 
 for (const key of requested) {
-  if (!messages.has(key) && !UNDEFINED_UPSTREAM.has(key) && !ourKeys.includes(key)) {
+  if (!messages.has(key) && !ownMessages.includes(key)) {
     problems.push(
-      `Message key "${key}" is not defined by Keycloak ${version}. It still type-checks, ` +
-        "because the types come from Keycloakify's copy, but nothing on the server resolves it."
+      `Message key "${key}" is not defined by Keycloak ${version}, so the page shows the key itself. If ` +
+        "Keycloak renamed it, follow the rename. If Keycloak never had one, add it to OWN_MESSAGES in src/i18n.ts."
     );
   }
 }
 
-for (const key of UNDEFINED_UPSTREAM) {
+/* Ours is a message under a key that only we define. Once Keycloak defines it, its message shows instead. */
+for (const key of ownMessages) {
   if (messages.has(key)) {
-    problems.push(`Keycloak ${version} defines "${key}" now, so drop it from UNDEFINED_UPSTREAM in ${SCRIPT}.`);
-  }
-}
-
-/*
- * Both, not just Keycloak's own bundle: Keycloakify's is what resolves a key in the browser, so a
- * key Keycloak defines and Keycloakify has yet to ship still needs ours, blank button otherwise.
- * The entries in i18n.ts say which are there for that reason.
- */
-for (const key of ourKeys) {
-  if (messages.has(key) && Object.hasOwn(keycloakifyMessages, key)) {
     problems.push(
-      `i18n.ts carries "${key}" only because Keycloakify's message set lacked it. It ships it ` +
-        "now, so delete ours and let Keycloak's own translation through."
+      `OWN_MESSAGES in src/i18n.ts lists "${key}", which Keycloak ${version} defines now, so its message ` +
+        "shows in place of ours. If it means the same, drop ours. Otherwise rename ours."
     );
   }
 }
@@ -617,7 +559,7 @@ for (const key of ourKeys) {
  * when Keycloak renamed a link means the page, moved to the new key, shows two chevrons.
  */
 for (const key of decorated) {
-  if (!messages.has(key) && !ourKeys.includes(key)) {
+  if (!messages.has(key) && !ownMessages.includes(key)) {
     problems.push(
       `DECORATED_LINK_KEYS in src/i18n.ts lists "${key}", which Keycloak ${version} does not define. ` +
         "If Keycloak renamed that link, list its new key instead, or the page using it shows two chevrons. Otherwise drop it."
@@ -627,7 +569,7 @@ for (const key of decorated) {
 
 for (const key of UPSTREAM_ONLY) {
   if (!upstreamKeys.has(key)) {
-    problems.push(`UPSTREAM_ONLY lists "${key}", which Keycloak ${version} does not name behind any page we implement. Drop it, or check the spelling, in ${SCRIPT}.`);
+    problems.push(`UPSTREAM_ONLY lists "${key}", which Keycloak ${version} does not name in its version of any page we implement. Drop it, or check the spelling, in ${SCRIPT}.`);
   }
 
   if (requested.includes(key)) {
@@ -641,7 +583,7 @@ for (const key of UPSTREAM_ONLY) {
  * upgrade looks clean. So each has to prove it still finds something.
  */
 if (!counterparts.some(name => withImports(root, [name]).length > 1)) {
-  problems.push(`No \`<#import>\` resolves in Keycloak's versions of our pages, so the report cannot see the macros behind them. Fix \`withImports\` in ${SCRIPT}.`);
+  problems.push(`No \`<#import>\` resolves in Keycloak's versions of our pages, so the report cannot see the macros they import. Fix \`withImports\` in ${SCRIPT}.`);
 }
 
 if (!counterparts.some(name => isPage(root, name))) {
@@ -658,7 +600,6 @@ const macroCalls = counterparts.filter(name => (templateText(root, name) ?? "").
 if (macroCalls.length > 0 && !macroCalls.some(name => /\slabel="[^"$]+"/.test(templateText(root, name) ?? ""))) {
   problems.push(`No label resolves in the pages of Keycloak's that render a button through its macro, so the report cannot see one it relabelled. Fix \`templateMessageKeys\` in ${SCRIPT}.`);
 }
-
 if (problems.length > 0) {
   console.error(`\nAgainst Keycloak ${version}:\n`);
 
@@ -670,15 +611,18 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`Keycloak ${version}: ${pages.length} implemented pages, every message key defined.`);
-
+const status = `Keycloak ${version}: ${pages.length} implemented pages, every message key defined.`;
 const before = versionBranchedFrom(version);
 
+/* On a branch that moves the version, this goes under the report's title instead. */
 if (before === undefined) {
+  console.log(status);
   process.exit(0);
 }
 
 const previousRoot = await themesRoot(before);
+const keycloakify = installedKeycloakify();
+const newer = newerKeycloakify(keycloakify);
 
 /* Both versions, so a template imported in only one of them, or moved between themes, is watched. */
 const ours = [...pages, ...SHARED_TEMPLATES];
@@ -716,31 +660,24 @@ const moved = [...basenames].sort().flatMap(basename => {
 
   return then !== undefined && now !== undefined && then !== now ? [{ then, now }] : [];
 });
-const behindOurPages = ({ then, now }) => watched.includes(then) || watched.includes(now);
-
-const appeared = [...names].filter(name => !previousNames.has(name) && !moved.some(({ now }) => now === name)).sort();
-const removed = [...previousNames].filter(name => !names.has(name) && !moved.some(({ then }) => then === name)).sort();
-const addedPages = appeared.filter(name => isPage(root, name));
-const addedMacros = appeared.filter(name => !isPage(root, name) && watched.includes(name));
+const inOurPages = ({ then, now }) => watched.includes(then) || watched.includes(now);
 
 /*
- * New pages the installed Keycloakify has no mock or type for. The dev server lists Keycloakify's
- * pages and ours are written against its types, so neither has one of these until Keycloakify is
- * updated. Within its major it only adds, and package.json already allows any release of it.
+ * A template is new when no theme had one by its name before, and gone when none has one now. A copy
+ * added or dropped beside one that was served throughout is neither, since that one still is.
  */
-const keycloakify = installedKeycloakify();
-const notInKeycloakify = [...new Set(addedPages.map(name => name.split("/")[1]))].filter(
-  page => !keycloakify.types.includes(`"${page}"`)
-);
-const keycloakifyMajor = keycloakify.version.split(".")[0];
+const appeared = [...names].filter(name => asServed(previousRoot, [name.split("/")[1]]).length === 0).sort();
+const removed = [...previousNames].filter(name => asServed(root, [name.split("/")[1]]).length === 0).sort();
+const newPages = [...new Set(appeared.filter(name => isPage(root, name)).map(name => name.split("/")[1]))];
 
 /*
  * A control Keycloak relabelled: its own version of one of our pages names a key our theme does not.
  * Nothing above sees this, because the key we still name goes on resolving.
  */
-const named = new Set([...requested, ...ourKeys]);
+const named = new Set([...requested, ...ownMessages]);
 const upstreamBefore = templateMessageKeys(previousRoot, servedThen);
-const startedUsing = [...templateMessageKeys(root, servedNow)]
+const upstreamNow = templateMessageKeys(root, servedNow);
+const startedUsing = [...upstreamNow]
   .filter(key => !upstreamBefore.has(key) && !named.has(key) && !UPSTREAM_ONLY.has(key))
   .sort();
 
@@ -751,71 +688,326 @@ const reworded = requested
   .sort();
 
 /*
- * A stand-in of ours Keycloak has started defining, so ours is English over a string it now
- * translates. Not a failure: Keycloakify's bundle is what resolves a key in the browser, and until
- * it ships this one, ours is the only thing that renders. The check above fails when it does.
+ * Each template in Keycloak's version of our pages that changed, in place or by moving to another
+ * theme, and which of them fail: the ones naming a key Keycloak started using.
  */
-const nowUpstream = ourKeys.filter(key => messages.has(key) && !messagesBefore.has(key)).sort();
+const changes = [...changed.map(name => ({ then: name, now: name })), ...moved.filter(inOurPages)]
+  .map(describeChange)
+  .sort((a, b) => a.now.localeCompare(b.now));
+const relabelled = changes.filter(change => change.started.length > 0);
 
-/* The release notes cover far more than templates and keys, and both URLs come from the version. */
-const lines = [
-  `## Keycloak ${before} to ${version}`,
-  "",
-  `Release notes: https://www.keycloak.org/docs/${version}/release_notes/`,
-  `Upgrading guide: https://www.keycloak.org/docs/${version}/upgrading/`,
-  "",
-  "Please read both: this check only reads login templates and English messages."
-];
+/* A key Keycloak started using in no template that changed, which only a new kind of change makes. */
+const unplaced = startedUsing.filter(key => !relabelled.some(change => change.started.includes(key)));
 
-if (startedUsing.length > 0) {
-  lines.push(
-    "",
-    "### Failure: Drift detected",
-    "",
-    "Keycloak relabelled a control our pages also have. Use its key on our page, or record why ours differ in `UPSTREAM_ONLY`.",
-    "",
-    `See \`${SCRIPT}\`.`,
-    "",
-    startedUsing.map(key => `- \`${key}\`: ${messages.get(key) ?? "(not in the English bundle)"}`).join("\n")
-  );
+/* Our pages whose counterpart in a version imports a template, directly or through others. */
+function pagesBehind(at, name) {
+  return pages.filter(page => withImports(at, asServed(at, [page])).includes(name));
 }
 
-/* Both paths in full rather than through brace expansion, which only some shells do. */
-const cachePath = (at, name) => `.keycloak-cache/${at}/theme/${name.replace("/", "/login/")}`;
-const diffCommand = (then, now) => `\`diff -u ${cachePath(before, then)} ${cachePath(version, now)}\``;
+/*
+ * One template in Keycloak's version of our pages across the upgrade: which of our pages it is part
+ * of, the keys it started naming that fail, and the keys it stopped naming that our pages still use.
+ * A macro new in this version is read as part of the template importing it, directly or through
+ * another new macro, since that is where it shows up.
+ */
+function describeChange({ then, now }) {
+  const newMacros = [];
 
-const sections = [
-  ["Keycloak changed these behind our pages", changed.map(name => `- \`${name}\`\n  ${diffCommand(name, name)}`)],
-  ["Reworded upstream, and we render it", reworded.map(key => `- \`${key}\`\n  was: ${messagesBefore.get(key)}\n  now: ${messages.get(key)}`)],
-  ["Defined upstream now, and src/i18n.ts stands in for it", nowUpstream.map(key => `- \`${key}\`: ${messages.get(key)}`)],
-  [
-    "Served from another theme now",
-    moved.map(move => {
-      const ours = behindOurPages(move) ? ", behind our pages" : "";
+  for (const queue = [now]; queue.length > 0; ) {
+    for (const name of directImports(root, queue.shift())) {
+      if (appeared.includes(name) && !newMacros.includes(name)) {
+        newMacros.push(name);
+        queue.push(name);
+      }
+    }
+  }
 
-      return `- \`${move.then}\` to \`${move.now}\`${ours}\n  ${diffCommand(move.then, move.now)}`;
+  const keysThen = templateMessageKeys(previousRoot, [then]);
+  const keysNow = templateMessageKeys(root, [now, ...newMacros]);
+
+  return {
+    then,
+    now,
+    newMacros,
+    pages: [...new Set([...pagesBehind(root, now), ...pagesBehind(previousRoot, then)])].sort(),
+    started: [...keysNow].filter(key => !keysThen.has(key) && startedUsing.includes(key)).sort(),
+    stillOurs: [...keysThen].filter(key => !keysNow.has(key) && named.has(key) && !upstreamNow.has(key)).sort()
+  };
+}
+
+/* Keycloak's English for a key, quoted, with the doubled quotes MessageFormat needs read as one. */
+function english(key, at = messages) {
+  const text = at.get(key) ?? messagesBefore.get(key);
+
+  return text === undefined ? "none in Keycloak's English" : `"${text.replaceAll("''", "'")}"`;
+}
+
+function code(text) {
+  return `\`${text}\``;
+}
+
+/* "a", "a and b", "a, b and c", or with "or" in place of "and". */
+function series(items, conjunction = "and") {
+  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} ${conjunction} ${items.at(-1)}`;
+}
+
+/* The files of ours that name a key, from src/pages or else from src: `login.ts`, `layout.ts`. */
+function namedIn(key) {
+  return series([...(uses.get(key) ?? [])].sort().map(file => code(file.replace(/^theme\/ui\/src\/(pages\/)?/, ""))));
+}
+
+/* A Markdown table, padded so that it lines up in the console too. */
+function table(rows) {
+  const cells = rows.map(row => row.map(cell => cell.replaceAll("|", "\\|")));
+  const widths = cells[0].map((_, column) => Math.max(...cells.map(row => row[column].length)));
+  const line = row => `| ${row.map((cell, column) => cell.padEnd(widths[column])).join(" | ")} |`;
+
+  return [line(cells[0]), line(widths.map(width => "-".repeat(width))), ...cells.slice(1).map(line)];
+}
+
+/*
+ * A template's path from theme/ui, where `yarn check-keycloak` runs, as this run read it: under
+ * `.keycloak/` rather than `.keycloak-cache/` when Gradle had unpacked that version.
+ */
+function templatePath(at, name) {
+  const [theme, basename] = name.split("/");
+
+  return relative(UI_DIR, join(loginDir(at, theme), basename)).replaceAll("\\", "/");
+}
+
+/* Our files for some of our pages, as `login.ts`, or "every page" for all of them. */
+function ourFiles(pageIds) {
+  return pageIds.length === pages.length ? "every page" : series(pageIds.map(page => code(pageFiles.get(page))));
+}
+
+/* What Keycloak did to a template, as a phrase that follows "Keycloak". */
+function whatChanged(change) {
+  const [theme, basename] = change.now.split("/");
+  const ownPage = change.pages.length === 1 && change.pages[0] === basename;
+  const its = ownPage ? "its " : "";
+  let did = `changed ${its}${code(change.now)}`;
+
+  if (change.then !== change.now) {
+    did = `serves ${its}${code(basename)} from ${code(theme)} now, not ${code(change.then.split("/")[0])}`;
+  }
+
+  if (ownPage) {
+    return did;
+  }
+
+  if (change.pages.length === pages.length) {
+    return `${did}, part of every page`;
+  }
+
+  return `${did}, part of its ${series(change.pages.map(code))}`;
+}
+
+/*
+ * Every failing key in one table: the keys Keycloak's version of our pages added that ours lacks,
+ * beside those it removed that ours still uses, with the ids of the pages each one is on, a line each.
+ */
+function failureTable() {
+  const rows = [
+    ...relabelled.flatMap(change => [
+      ...change.started.map(key => ["added", key, change.pages]),
+      ...change.stillOurs.map(key => ["removed", key, change.pages])
+    ]),
+    ...unplaced.flatMap(key =>
+      servedNow
+        .filter(name => templateMessageKeys(root, [name]).has(key))
+        .map(name => ["added", key, pagesBehind(root, name)])
+    )
+  ];
+
+  return table([
+    ["Change", "Key", "English", "Pages"],
+    ...rows.map(([change, key, ids]) => [
+      change,
+      code(key),
+      english(key),
+      ids.length === pages.length ? "every page" : ids.map(code).join("<br>")
+    ])
+  ]);
+}
+
+/* The changes that do not fail, one row each, with the keys removed that ours still uses where any were. */
+function otherChangesTable(changes) {
+  const removedAny = changes.some(change => change.stillOurs.length > 0);
+
+  return table([
+    ["Our page", "Keycloak", ...(removedAny ? ["Removed, and ours still uses"] : [])],
+    ...changes.map(change => [
+      ourFiles(change.pages),
+      whatChanged(change),
+      ...(removedAny ? [series(change.stillOurs.map(code))] : [])
+    ])
+  ]);
+}
+
+/*
+ * Each key Keycloak reworded, before and after. Then any whose placeholders changed, since the
+ * arguments our page passes may no longer fit.
+ */
+function rewordedTable(keys) {
+  const placeholders = text => [...new Set(text.match(/\{\d+\}/g) ?? [])].sort().join(", ") || "none";
+  const shifted = keys.filter(key => placeholders(english(key, messagesBefore)) !== placeholders(english(key)));
+
+  return [
+    ...table([
+      ["Key", "Shown by", `Keycloak ${before}`, `Keycloak ${version}`],
+      ...keys.map(key => [code(key), namedIn(key), english(key, messagesBefore), english(key)])
+    ]),
+    ...(shifted.length > 0 ? [""] : []),
+    ...shifted.map(key => {
+      const [then, now] = [english(key, messagesBefore), english(key)].map(placeholders);
+
+      return `- ${code(key)} takes ${now === "none" ? "no placeholders" : now} now, where it took ${then}: check the arguments our page passes.`;
     })
-  ],
-  ["New pages upstream", addedPages.map(name => `- \`${name}\``)],
-  [
-    `New pages Keycloakify ${keycloakify.version} does not have. Update it to its latest ${keycloakifyMajor}.x release and ` +
-      "check they show up in the dev server; if they do not, no release has them yet",
-    notInKeycloakify.map(page => `- \`${page}\``)
-  ],
-  ["New macros behind our pages", addedMacros.map(name => `- \`${name}\``)],
-  ["Gone upstream", removed.map(name => `- \`${name}\``)]
-].filter(([, items]) => items.length > 0);
+  ];
+}
 
-lines.push(
-  "",
-  "### Consider checking",
-  "",
-  sections.length === 0
-    ? "Nothing behind our pages changed."
-    : sections.map(([heading, items]) => `${heading}:\n\n${items.join("\n")}`).join("\n\n")
-);
+/* A template's diff across the upgrade, as commands to run in theme/ui, with each macro new in this version it imports. */
+function diffBlock(change) {
+  const macros = change.newMacros.map(name => code(name.split("/")[1]));
 
-const report = `${lines.join("\n")}\n`;
+  return [
+    `${code(change.now)}${macros.length > 0 ? `, and the ${series(macros)} it imports, new in ${version}` : ""}:`,
+    "",
+    "```sh",
+    `diff -u ${templatePath(previousRoot, change.then)} ${templatePath(root, change.now)}`,
+    ...change.newMacros.map(name => `cat ${templatePath(root, name)}`),
+    "```"
+  ];
+}
+
+function newPageItem(page) {
+  const [served] = asServed(root, [page]);
+  const verdict = keycloakify.types.includes(`"${page}"`)
+    ? `Keycloakify ${keycloakify.version} has it: see it in the dev server, and add it to \`theme/ui/src/pages\` if it should look like ours.`
+    : `Keycloakify ${keycloakify.version} has no types or mock for it, so it can neither be built on nor seen in the dev server.`;
+
+  return [`- ${code(page)}, served from ${code(served.split("/")[0])}`, `  - ${verdict}`];
+}
+
+/* What fails, and everything else the upgrade changed: each a list of sections. */
+const failures = [];
+const others = [];
+
+if (relabelled.length > 0 || unplaced.length > 0) {
+  failures.push([
+    "### Keycloak relabelled a control on our pages",
+    "",
+    "Keycloak's version of our pages uses new message keys, for a control it relabelled or added, while our " +
+      `theme does not. Use those keys on our pages or add them to \`UPSTREAM_ONLY\` in \`${SCRIPT}\`. A removed ` +
+      "key is one Keycloak dropped there that our page still uses, often the one a new key replaces.",
+    "",
+    ...failureTable()
+  ]);
+}
+
+const otherChanges = changes.filter(change => !relabelled.includes(change));
+
+/* Templates Keycloak deleted that its version of one of our pages imported. */
+const removedOurs = removed.filter(name => watched.includes(name));
+
+if (otherChanges.length > 0 || removedOurs.length > 0) {
+  others.push([
+    "### Changed in Keycloak's version of our pages",
+    "",
+    "Compare each with our page, and follow it where it applies.",
+    "",
+    ...(otherChanges.length > 0 ? otherChangesTable(otherChanges) : []),
+    ...(otherChanges.length > 0 && removedOurs.length > 0 ? [""] : []),
+    ...removedOurs.map(name => `- ${code(name)} is gone. Keycloak's version of ${ourFiles(pagesBehind(previousRoot, name))} imported it.`)
+  ]);
+}
+
+if (reworded.length > 0) {
+  others.push([
+    "### Reworded upstream",
+    "",
+    "Keycloak changed the English of these messages, and our pages show the new wording.",
+    "",
+    ...rewordedTable(reworded)
+  ]);
+}
+
+if (newPages.length > 0) {
+  others.push([
+    "### New pages upstream",
+    "",
+    "Our theme does not implement these, so Keycloak serves its own.",
+    "",
+    ...newPages.flatMap(newPageItem)
+  ]);
+}
+
+const elsewhere = [
+  ...moved.filter(move => !inOurPages(move)).map(({ then, now }) => `- ${code(then)} is served from ${code(now)} now`),
+  ...removed.filter(name => !watched.includes(name)).map(name => `- ${code(name)} is gone`)
+];
+
+if (elsewhere.length > 0) {
+  others.push(["### Elsewhere upstream", "", "No part of a page we implement, so nothing to change.", "", ...elsewhere]);
+}
+
+if (changes.length > 0) {
+  others.push([
+    "### Upstream diffs",
+    "",
+    "Optional, for reading a change above in full. Run them in `theme/ui` once `yarn check-keycloak` has " +
+      "downloaded the files.",
+    ...[...relabelled, ...otherChanges].flatMap(change => ["", ...diffBlock(change)])
+  ]);
+}
+
+const group = (title, sections) => [
+  `## ${title}`,
+  ...(sections.length === 0 ? [["None."]] : sections).flatMap(section => ["", ...section])
+];
+
+/*
+ * How far the installed Keycloakify is behind, and the commands that find out whether a newer one
+ * helps.
+ */
+function keycloakifyLag() {
+  const intro = "Our pages take their types and dev-server mocks from Keycloakify.";
+
+  if (newer.length === 0) {
+    return [`${intro} ${keycloakify.version} is installed, the newest release.`];
+  }
+
+  const newest = newer.at(-1);
+  const releases = newer.length === 1 ? "1 release" : `${newer.length} releases`;
+
+  return [
+    `${intro} ${keycloakify.version} is installed, ${releases} behind the newest (${newest}). Where a new page below ` +
+      `has no types or mock in ${keycloakify.version}, upgrade and run this check again to see whether ${newest} has them:`,
+    "",
+    "```sh",
+    "yarn up keycloakify",
+    "yarn check-keycloak",
+    "```"
+  ];
+}
+
+const report = [
+  `# Keycloak ${before} to ${version}`,
+  "",
+  status,
+  "",
+  `- Release notes: https://www.keycloak.org/docs/${version}/release_notes/`,
+  `- Upgrading guide: https://www.keycloak.org/docs/${version}/upgrading/`,
+  "",
+  "Please read both: this check only reads login templates and English messages.",
+  "",
+  ...keycloakifyLag(),
+  "",
+  ...group("Failures", failures),
+  "",
+  ...group("Other changes", others),
+  ""
+].join("\n");
 
 console.log(`\n${report}`);
 
@@ -826,11 +1018,11 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 if (process.env.GITHUB_ACTIONS === "true") {
   const annotations = [
     ...startedUsing.map(key => ["error", `Keycloak labels a control with "${key}", our theme does not`]),
-    ...changed.map(name => ["warning", `${name} changed behind one of our pages`]),
-    ...moved.filter(behindOurPages).map(({ then, now }) => ["warning", `${now} replaces ${then} behind one of our pages`]),
-    ...reworded.map(key => ["warning", `"${key}" is reworded upstream, and we render it`]),
-    ...nowUpstream.map(key => ["warning", `Keycloak defines "${key}" now, which src/i18n.ts stands in for`]),
-    ...notInKeycloakify.map(page => ["warning", `${page} is new upstream, and Keycloakify ${keycloakify.version} does not have it`])
+    ...otherChanges.map(({ then, now }) => ["warning", `Keycloak ${then === now ? "changed" : `serves ${now} in place of`} ${then}, part of a page we implement`]),
+    ...reworded.map(key => ["warning", `"${key}" is reworded upstream, and our pages show it`]),
+    ...newPages
+      .filter(page => !keycloakify.types.includes(`"${page}"`))
+      .map(page => ["warning", `${page} is new upstream, and Keycloakify ${keycloakify.version} does not have it`])
   ];
 
   for (const [level, text] of annotations) {

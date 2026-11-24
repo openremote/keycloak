@@ -3,7 +3,8 @@
 # The build only proves the theme compiles and packages. It cannot say whether the pages this
 # theme replaces still exist upstream, or whether the message keys it names are still defined,
 # so this does, against the version the Dockerfile pins. On a branch that moves that version it
-# also reports which of Keycloak's own versions of our pages changed, into the job summary.
+# also writes a report to the job summary: what changed in Keycloak's version of our pages, and how
+# far the installed Keycloakify is behind its newest release.
 #
 # Separate from the CI/CD workflow on purpose: this is the one job that reaches Maven Central,
 # and a release build must not fail because that was unreachable.
@@ -17,31 +18,36 @@ on:
       - 'Dockerfile'
       - 'theme/ui/src/**'
       - 'theme/ui/scripts/check-keycloak-drift.mjs'
-      # Read by the check: which pages the theme implements, and the parent theme the rest fall
-      # through to.
+      # Read by the check: which pages the theme implements, the message keys they name, and the
+      # parent theme the rest fall through to.
       - 'theme/ui/scripts/implemented-pages.mjs'
+      - 'theme/ui/scripts/message-keys.mjs'
       - 'theme/build.gradle'
       - '.github/workflows/keycloak-drift.yml'
-      # The check reads keycloakify's bundled message set, so an upgrade of it changes the answer.
+      # The check reads the installed keycloakify, so an upgrade of it changes the answer.
       - 'theme/ui/package.json'
       - 'theme/ui/yarn.lock'
       - 'theme/ui/dev-server/**'
-      - 'theme/build.gradle'
+      # The report asks the Yarn release .yarnrc.yml names, with its registry settings.
+      - 'theme/ui/.yarnrc.yml'
+      - 'theme/ui/.yarn/releases/**'
 
   pull_request:
     paths:
       - 'Dockerfile'
       - 'theme/ui/src/**'
       - 'theme/ui/scripts/check-keycloak-drift.mjs'
-      # Read by the check: which pages the theme implements, and the parent theme the rest fall
-      # through to.
+      # Read by the check: which pages the theme implements, the message keys they name, and the
+      # parent theme the rest fall through to.
       - 'theme/ui/scripts/implemented-pages.mjs'
+      - 'theme/ui/scripts/message-keys.mjs'
       - 'theme/build.gradle'
       - '.github/workflows/keycloak-drift.yml'
       - 'theme/ui/package.json'
       - 'theme/ui/yarn.lock'
       - 'theme/ui/dev-server/**'
-      - 'theme/build.gradle'
+      - 'theme/ui/.yarnrc.yml'
+      - 'theme/ui/.yarn/releases/**'
 
   workflow_dispatch:
 
@@ -70,8 +76,8 @@ jobs:
         with:
           node-version: '22'
 
-      # Only for keycloakify's bundled message set, which the check reads to decide whether the
-      # stand-ins in src/i18n.ts are still needed.
+      # Only for the installed keycloakify, whose types say which of Keycloak's pages it has, and
+      # whose version the report compares with its newest release.
       - name: Install dependencies
         working-directory: theme/ui
         # The release .yarnrc.yml names: a glob would pass a second one to the first as an argument.

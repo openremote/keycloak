@@ -20,7 +20,7 @@ type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
  * submit buttons in one form rather than links.
  */
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, idpAlias, idpDisplayName, hideReviewButton } = kcContext;
+  const { url, hideReviewButton } = kcContext;
   const { msgStr } = i18n;
 
   return layout({
@@ -31,19 +31,12 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
       <form id="kc-idp-link-confirm-form" action=${url.loginAction} method="post">
         <div class="or-actions">
           <!--
-            Keycloak renders these the other way round and gives neither precedence. Linking is
-            made the primary action because it is the one the flow exists to offer: the user
+            Keycloak makes linking the primary action too, but puts the review button above it.
+            Linking comes first here because it is the one the flow exists to offer: the user
             has just proved they own the provider account, and reviewing the profile is the
             detour. The design's Actions frame pairs exactly one primary with one tertiary.
-
-            The argument is unused by the English message ("Add to existing account") but not by
-            every translation, and it is what Keycloak passes.
           -->
-          ${submitButton(
-            msgStr("confirmLinkIdpContinue", idpDisplayName ?? idpAlias),
-            "submitAction",
-            "linkAccount"
-          )}
+          ${submitButton(msgStr("confirmLinkIdpContinue"), "submitAction", "linkAccount")}
           ${hideReviewButton
             ? null
             : submitButton(

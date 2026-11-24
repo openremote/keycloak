@@ -13,11 +13,13 @@ type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
 /*
  * 2FA signup.
  *
- * totp.supportedApplications holds message *keys* ("totpAppFreeOTPName" and friends), as does
- * the policy type ("totp"/"hotp", looked up as "loginTotp.totp"). i18n.advancedMsgStr is the
- * variable-key form: it looks the key up and returns it unchanged when there is no
- * translation, so an application Keycloak adds later degrades to its key rather than
- * disappearing.
+ * totp.supportedApplications holds message *keys* ("totpAppFreeOTPName" and friends), which
+ * Keycloak resolves because they arrive in kcContext. i18n.advancedMsgStr is the variable-key
+ * form: it looks the key up and returns it unchanged when there is no translation, so an
+ * application Keycloak adds later degrades to its key rather than disappearing.
+ *
+ * The policy type ("totp"/"hotp") is not a key, so its label's key is written out in full: the
+ * build only has Keycloak resolve the keys a page names as literals.
  *
  * Careful with comments inside an html`` template: `${...}` in one is a real interpolation,
  * not documentation, and the compiler will try to evaluate it.
@@ -65,7 +67,7 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
               <p>${msgStr("loginTotpManualStep3")}</p>
               <ul class="or-steps__meta">
                 <li>
-                  ${msgStr("loginTotpType")}: ${advancedMsgStr(`loginTotp.${totp.policy.type}`)}
+                  ${msgStr("loginTotpType")}: ${msgStr(totp.policy.type === "hotp" ? "loginTotp.hotp" : "loginTotp.totp")}
                 </li>
                 <!-- getAlgorithmKey(), not algorithm: the latter is the JCA name ("HmacSHA1"),
                      the former is what an authenticator app asks for ("SHA1"). Keycloak's own

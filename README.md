@@ -197,7 +197,7 @@ Run these against at least `login`, `register` and `login-config-totp` — the s
 
 - **Branding.** A realm with its own `manager_config.json` shows its logo, application title, brand color **and favicon**, with no flash of stock OpenRemote branding first. A realm with no entry falls back cleanly. A config using the legacy `--or-app-color4` brands correctly.
 - **Dark mode.** Every page in `prefers-color-scheme: dark`, including the alert colors and the 2FA QR code, which needs a light backdrop to stay scannable.
-- **Translations.** Switch to a non-English language: the whole page changes, including anything this theme adds. Nothing shows a literal `«`. Check one right-to-left language for layout.
+- **Translations.** Switch to a non-English language: the whole page changes, apart from those of this theme's own few messages (`OWN_MESSAGES` in `theme/ui/src/i18n.ts`) with no translation there, which stay English. Nothing shows a literal `«`. Check one right-to-left language for layout.
 - **Narrow screens.** 320px wide: nothing clipped, and the language switcher does not sit on top of the logo.
 - **Inherited pages.** Spot-check a page this theme does *not* implement, e.g. `select-authenticator` or `terms` — those come from Keycloak's own theme and must still work.
 
@@ -247,11 +247,11 @@ It serves that theme's `resources/` and applies what `orStyles` names, reloading
 
 `orStyles` rather than Keycloak's own `styles=`, because that property is inherited from the fallback theme and is what the pages this theme does not implement are rendered with: reading it would put the fallback theme's stylesheet on these pages, and declaring our own would take it away from theirs.
 
-Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. It cannot override messages: every string in these pages comes from the compiled bundle.
+Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. Its `messages_*.properties` reach the messages on our pages as well, as do a realm's localization overrides, because Keycloak resolves each key a page names while it renders the page.
 
 ### Translations
 
-Pages address Keycloak's own message keys, and Keycloakify ships Keycloak's bundle for ~30 languages, so enabling internationalization on a realm translates the theme.
+Pages address Keycloak's own message keys, and Keycloak resolves them while it renders each page, so enabling internationalization on a realm translates the theme into every language Keycloak has.
 
 The wording is Keycloak's, including in English. This theme does not keep a house-style copy deck: an override can only be written in one language at a time, so it would show on an English page and nowhere else, and the theme would own auth copy it has no way to translate. A string that reads wrong reads wrong in every language, and the fix belongs in Keycloak.
 

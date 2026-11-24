@@ -25,7 +25,12 @@ const DECLARES = /\bexport\s+const\s+pageId\b/;
 
 /** Every page id declared in src/pages, sorted. */
 export function implementedPages() {
-  const pages = new Set();
+  return [...implementedPageFiles().keys()].sort();
+}
+
+/** Every page id declared in src/pages, to the name of the file in src/pages that declares it. */
+export function implementedPageFiles() {
+  const pages = new Map();
 
   for (const basename of readdirSync(PAGES_DIR)) {
     if (!basename.endsWith(".ts")) {
@@ -36,7 +41,7 @@ export function implementedPages() {
     const match = DECLARATION.exec(source);
 
     if (match !== null) {
-      pages.add(match[1]);
+      pages.set(match[1], basename);
       continue;
     }
 
@@ -54,5 +59,5 @@ export function implementedPages() {
     throw new Error(`No page implementations found in ${PAGES_DIR}.`);
   }
 
-  return [...pages].sort();
+  return pages;
 }

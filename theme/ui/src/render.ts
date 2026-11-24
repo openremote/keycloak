@@ -1,6 +1,6 @@
 import { render } from "lit";
 import type { KcContext } from "./login/KcContext";
-import { getI18n } from "./i18n";
+import { getI18n, languageTag } from "./i18n";
 import { pages } from "./page-registry";
 
 export type ThemeOverride = "light" | "dark" | null;
@@ -60,19 +60,9 @@ export function renderPage(kcContext: KcContext, root: HTMLElement): void {
     );
   }
 
-  /*
-   * i18n resolves synchronously in English so there is no blank first paint; for any other
-   * realm language the bundle is fetched and prI18n_currentLanguage settles, at which point
-   * we render again. Lit diffs, so that second pass only touches the strings that changed.
-   *
-   * prI18n_currentLanguage is undefined when there is nothing to wait for: English, or a
-   * realm with internationalization off, which is the common case.
-   */
-  const { i18n, prI18n_currentLanguage } = getI18n({ kcContext });
+  // As Keycloak's own template sets them: the page is in the language its messages are in.
+  document.documentElement.lang = languageTag(kcContext);
+  document.documentElement.dir = kcContext.locale?.rtl ? "rtl" : "ltr";
 
-  render(page(kcContext, i18n), root);
-
-  void prI18n_currentLanguage?.then(translated => {
-    render(page(kcContext, translated), root);
-  });
+  render(page(kcContext, getI18n(kcContext)), root);
 }
