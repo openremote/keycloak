@@ -280,7 +280,7 @@ public class StockRenderer {
         Properties messages(String locale) {
             return messagesByLocale.computeIfAbsent(locale, tag -> {
                 Properties merged = new Properties();
-                for (String bundle : tag.equals("en") ? List.of("en") : List.of("en", tag.replace('-', '_'))) {
+                for (String bundle : bundles(tag)) {
                     for (int i = chain.size() - 1; i >= 0; i--) {
                         try {
                             merged.putAll(properties(chain.get(i).resolve("messages/messages_" + bundle + ".properties")));
@@ -292,6 +292,20 @@ public class StockRenderer {
                 return merged;
             });
         }
+    }
+
+    /*
+     * The message bundles for a language tag, each over the one before, as Keycloak merges them:
+     * English, then the language for a regional variant of it (de under de-CH), then the tag's own.
+     * Keycloak ships Chinese by script, and reads zh-CN and zh-TW from those.
+     */
+    private static List<String> bundles(String tag) {
+        String own = switch (tag) {
+            case "zh-CN" -> "zh_Hans";
+            case "zh-TW" -> "zh_Hant";
+            default -> tag.replace('-', '_');
+        };
+        return List.of("en", tag.split("-")[0], own).stream().distinct().toList();
     }
 
     private static Properties properties(Path path) throws IOException {
