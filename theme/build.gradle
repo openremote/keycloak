@@ -43,8 +43,16 @@ def FALLBACK_THEME = providers.gradleProperty('loginParentTheme').getOrElse('key
 // The only jar target enabled in ui/package.json, so this name is fixed.
 def uiJar = new File(uiBuildDir, 'keycloak-theme-for-kc-all-other-versions.jar')
 
-// Written by ui/scripts/write-implemented-pages.mjs, one .ftl basename per line.
-def implementedPagesFile = new File(uiBuildDir, 'implemented-pages.txt')
+// Written by ui/scripts/write-implemented-pages.mjs: each .ftl basename we implement, to the message keys it names.
+def implementedPagesFile = new File(uiBuildDir, 'implemented-pages.json')
+
+/*
+ * Where Keycloakify's template gathers the messages it hands the page, and the lookup it gathers
+ * them with. The keys a page names go straight after, so Keycloak resolves those too. The marker
+ * is how the check after unpacking knows they went in.
+ */
+def MESSAGES_ANCHOR = '<@addNonAutomaticallyGatherableMessagesToXKeycloakifyMessages />'
+def MESSAGES_MARKER = '<#-- The message keys this page names, added by theme/build.gradle -->'
 
 def unpackedThemeDir = layout.buildDirectory.dir('login-theme').get().asFile
 
@@ -93,6 +101,7 @@ tasks.register('buildLoginTheme', Exec) {
  *   - which pages we actually implement; the rest are dropped so that Keycloak resolves them
  *     through the theme's `parent=` and serves them from its own theme
  *   - which theme that is; see below
+ *   - where the messages come from: Keycloak, for every page; see below
  */
 tasks.register('unpackLoginTheme', Sync) {
     description = 'Unpacks the built login theme, dropping the pages Keycloak will serve itself'
@@ -105,9 +114,17 @@ tasks.register('unpackLoginTheme', Sync) {
     // Declared, so changing it re-runs this: without it the task stays up to date and the flag
     // silently does nothing, which is a worse failure than not having the flag.
     inputs.property('loginParentTheme', FALLBACK_THEME)
+    inputs.file(implementedPagesFile)
 
     from(zipTree(uiJar)) {
         exclude 'META-INF/**'
+        /*
+         * Keycloakify's copy of Keycloak's messages. A theme's own messages take precedence over its
+         * parents', so this copy would replace Keycloak's wording, and its translations, on every
+         * page: ours, and the ones Keycloak serves from `parent=`. Without it, Keycloak resolves
+         * every message through the parents, in the version it runs, with the realm's overrides.
+         */
+        exclude 'theme/openremote/login/messages/**'
     }
     into unpackedThemeDir
 
@@ -115,10 +132,20 @@ tasks.register('unpackLoginTheme', Sync) {
         if (!details.name.endsWith('.ftl')) {
             return
         }
-        def implemented = implementedPagesFile.readLines().findAll { !it.isBlank() } as Set
-        if (!implemented.contains(details.name)) {
+        def keys = new groovy.json.JsonSlurper().parse(implementedPagesFile)[details.name]
+        if (keys == null) {
             details.exclude()
+            return
         }
+
+        /*
+         * Keycloak resolves each key with the lookup Keycloakify uses for those in kcContext, which
+         * skips a key Keycloak has no message for. The page's i18n checks what it resolved before
+         * Keycloakify's bundled copy, which is what the page fell back to for these keys.
+         */
+        def lookup = "<#list ${groovy.json.JsonOutput.toJson(keys)} as key>" +
+                '<@addToXKeycloakifyMessagesIfMessageKey str=key /></#list>'
+        details.filter { line -> line == MESSAGES_ANCHOR ? "${line}\n${MESSAGES_MARKER}\n${lookup}".toString() : line }
     }
     includeEmptyDirs = false
 
@@ -131,6 +158,16 @@ tasks.register('unpackLoginTheme', Sync) {
     }
 
     doLast {
+        // If a Keycloakify upgrade changes that line, the pages would quietly go back to its copy.
+        new File(unpackedThemeDir, 'theme/openremote/login').listFiles()
+                .findAll { it.name.endsWith('.ftl') && !it.text.contains(MESSAGES_MARKER) }
+                .each { ftl ->
+                    throw new GradleException(
+                            "Expected a `${MESSAGES_ANCHOR}` line in the generated ${ftl.name} to add its message " +
+                                    'keys after, but there is none. Find where the Keycloakify template now gathers ' +
+                                    'its messages, and update MESSAGES_ANCHOR to match.')
+                }
+
         // If a Keycloakify upgrade stops writing that line, fail here rather than quietly
         // shipping whatever it wrote instead, since the dev server reads this file to preview
         // the same pages.

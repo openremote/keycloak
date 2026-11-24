@@ -1,5 +1,6 @@
 /*
- * Writes the list of login pages this theme implements, for the packaging step to act on.
+ * Writes the login pages this theme implements, each to the message keys it names, for the
+ * packaging step to act on.
  *
  * Keycloakify emits a .ftl for every login page Keycloak has and routes them all into
  * src/main.ts, which would mean owning all 39. We implement the handful in src/pages; for
@@ -12,19 +13,23 @@
  * src/page-registry.ts scans that directory: adding a file there should be the only step
  * needed to implement a page. scripts/implemented-pages.mjs does the reading, because the
  * Keycloak check has to answer from the same list.
+ *
+ * The keys are for Keycloak to resolve. Keycloakify's generated template already hands the page
+ * every message Keycloak resolved for a key-shaped string in kcContext, in
+ * `x-keycloakify.messages`, which the page's i18n checks before Keycloakify's bundled copy. The
+ * keys a page names itself are not in kcContext, so they would come from that copy, which lags
+ * Keycloak's wording and has fewer languages. theme/build.gradle adds a lookup for each to the
+ * page's template, and Keycloak resolves them like the rest: in the user's language, with the
+ * realm's own overrides. Per page rather than every key on every page, because each one is
+ * written into the page itself.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { implementedPages } from "./implemented-pages.mjs";
+import { pageMessageKeys } from "./message-keys.mjs";
 
 /* Where theme/build.gradle reads it, rather than below the working directory. */
-const OUTPUT_FILE = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "build_keycloak",
-  "implemented-pages.txt"
-);
+const OUTPUT_FILE = resolve(dirname(fileURLToPath(import.meta.url)), "..", "build_keycloak", "implemented-pages.json");
 
 /*
  * Keycloakify also writes these aliases, under the names Keycloak used before the user
@@ -35,21 +40,30 @@ const ALIASES = {
   "login-update-profile.ftl": "update-user-profile.ftl"
 };
 
-const pageIds = new Set();
+/* What the template's lookup accepts; it skips anything else without a word. */
+const RESOLVABLE = /^[a-zA-Z0-9-_.]+$/;
 
-for (const pageId of implementedPages()) {
-  pageIds.add(pageId);
+const pages = {};
 
-  const alias = ALIASES[pageId];
+for (const [pageId, keys] of pageMessageKeys()) {
+  const unresolvable = keys.filter(key => !RESOLVABLE.test(key));
 
-  if (alias !== undefined) {
-    pageIds.add(alias);
+  if (unresolvable.length > 0) {
+    throw new Error(
+      `${pageId} names ${unresolvable.map(key => `"${key}"`).join(", ")}, which Keycloakify's template cannot ` +
+        "look up: a key there is letters, digits, `-`, `_` and `.` only."
+    );
+  }
+
+  pages[pageId] = keys;
+
+  if (ALIASES[pageId] !== undefined) {
+    pages[ALIASES[pageId]] = keys;
   }
 }
 
-const sorted = [...pageIds].sort();
-
 mkdirSync(dirname(OUTPUT_FILE), { recursive: true });
-writeFileSync(OUTPUT_FILE, `${sorted.join("\n")}\n`, "utf8");
+writeFileSync(OUTPUT_FILE, `${JSON.stringify(pages, null, 2)}\n`, "utf8");
 
-console.log(`Implemented pages (${sorted.length}): ${sorted.join(", ")}`);
+const counts = Object.entries(pages).map(([template, keys]) => `${template} (${keys.length} keys)`);
+console.log(`Implemented pages (${counts.length}): ${counts.join(", ")}`);

@@ -91,6 +91,33 @@ export async function renderStock(
   }
 }
 
+/**
+ * What Keycloak resolves for the message keys one of our pages names, which theme/build.gradle has
+ * it look up while rendering the page, from the stock renderer. Used as they come: Keycloakify's
+ * template escapes each message into the page and decodes it again, so the page gets it unchanged.
+ * Empty when the renderer is not available: the page then shows Keycloakify's bundled copy, as it
+ * does for any key Keycloak did not resolve.
+ */
+export async function keycloakMessages(pageId: string, language: string): Promise<Record<string, string>> {
+  try {
+    const response = await fetch("/__stock/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pageId, locale: language })
+    });
+    const body = (await response.json()) as { messages?: Record<string, string>; error?: string };
+
+    if (body.messages === undefined) {
+      throw new Error(body.error ?? `HTTP ${response.status}`);
+    }
+
+    return body.messages;
+  } catch (error) {
+    console.warn(`${pageId} shows Keycloakify's copy of its messages: Keycloak's could not be resolved.`, error);
+    return {};
+  }
+}
+
 /* ------------------------------------------------------------------ unimplemented pages */
 
 const FALLBACK_STYLES = `

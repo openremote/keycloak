@@ -3,13 +3,15 @@ import { i18nBuilder } from "keycloakify/login/i18n/noJsx";
 /*
  * Translations.
  *
- * Keycloakify ships Keycloak's own message bundle for every language Keycloak translates, and
- * fetches the right one at runtime, so pages address strings by Keycloak's message keys rather
- * than by literal English and a realm with internationalization on is translated for free.
+ * Pages address strings by Keycloak's message keys rather than by literal English, and Keycloak
+ * resolves them while it renders the page, in the user's language and with the realm's overrides:
+ * theme/build.gradle adds a lookup to each page's template for the keys the page names, as
+ * Keycloakify's template already does for those kcContext carries. The i18n below checks what
+ * Keycloak resolved first, and falls back to Keycloakify's bundled copy of Keycloak's messages only
+ * for a key Keycloak did not.
  *
  * The `noJsx` entry point is what makes this usable here: Keycloakify's i18n is otherwise a
- * React hook, but it also ships a plain function API, so a Lit theme gets the whole message
- * set for free.
+ * React hook, but it also ships a plain function API.
  *
  * The wording is Keycloak's, deliberately. Overriding a string only ever works in one language,
  * so every other locale keeps Keycloak's phrasing regardless, and it puts this theme in the
@@ -23,8 +25,10 @@ import { i18nBuilder } from "keycloakify/login/i18n/noJsx";
 
 /*
  * Keycloak's own messages that Keycloakify's bundled message set has yet to ship, copied verbatim
- * from Keycloak's English. Without one, the control it labels renders blank. Each is temporary:
- * the Keycloak check fails once the installed Keycloakify has it, and then it goes.
+ * from Keycloak's English. Keycloak resolves them like any other key a page names. Ours give the
+ * key a type, since msgStr only takes keys Keycloakify knows, and an English fallback where nothing
+ * resolved it, such as the dev server without Java. Each is temporary: the Keycloak check fails once
+ * the installed Keycloakify has it, and then it goes.
  */
 const KEYCLOAK_STAND_INS = {
   // The organization switcher, under "Try another way".
@@ -60,8 +64,9 @@ const OWN_MESSAGES = {
 
 /*
  * English is the only thing either can fall back to. getI18n uses the block for the current
- * language if there is one and the `en` block otherwise, so everything here shows in every
- * language. Adding a language block below translates them.
+ * language if there is one and the `en` block otherwise, so our own messages show in English in
+ * every language, and so does a stand-in wherever Keycloak did not resolve it. Adding a language
+ * block below translates them.
  */
 const { getI18n: getI18n_base, ofTypeI18n } = i18nBuilder
   .withThemeName<"openremote">()

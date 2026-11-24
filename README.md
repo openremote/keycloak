@@ -247,11 +247,11 @@ It serves that theme's `resources/` and applies what `orStyles` names, reloading
 
 `orStyles` rather than Keycloak's own `styles=`, because that property is inherited from the fallback theme and is what the pages this theme does not implement are rendered with: reading it would put the fallback theme's stylesheet on these pages, and declaring our own would take it away from theirs.
 
-Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. It cannot override most messages, which come from the compiled bundle. The exceptions are the ones the server resolves for the page: the terms text (`termsText`), the names of required actions, and labels a realm configures, such as user-profile attributes. A child theme's `messages_*.properties` reaches those, as do a realm's localization overrides.
+Write against the design system's tokens (`--or-color-*`) and the block classes the pages render (`.or-login`, `.or-card`, `.or-field`, `.or-actions`); anything deeper is internal to Vaadin's components and will move. A child theme can also override a whole page's `.ftl`, which Keycloak serves instead of ours. Its `messages_*.properties` reach the messages on our pages as well, as do a realm's localization overrides, because Keycloak resolves each key a page names while it renders the page.
 
 ### Translations
 
-Pages address Keycloak's own message keys, and Keycloakify ships Keycloak's bundle for ~30 languages, so enabling internationalization on a realm translates the theme.
+Pages address Keycloak's own message keys, and Keycloak resolves them while it renders each page, so enabling internationalization on a realm translates the theme into every language Keycloak has.
 
 The wording is Keycloak's, including in English. This theme does not keep a house-style copy deck: an override can only be written in one language at a time, so it would show on an English page and nowhere else, and the theme would own auth copy it has no way to translate. A string that reads wrong reads wrong in every language, and the fix belongs in Keycloak.
 

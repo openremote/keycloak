@@ -20,7 +20,7 @@ type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
  * submit buttons in one form rather than links.
  */
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
-  const { url, idpAlias, idpDisplayName, hideReviewButton } = kcContext;
+  const { url, hideReviewButton } = kcContext;
   const { msgStr } = i18n;
 
   return layout({
@@ -35,16 +35,8 @@ export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
             Linking comes first here because it is the one the flow exists to offer: the user
             has just proved they own the provider account, and reviewing the profile is the
             detour. The design's Actions frame pairs exactly one primary with one tertiary.
-
-            The argument is unused by the English message ("Add to existing account"), and
-            Keycloak's button macro passes none, but Keycloakify's French message, which is the
-            one the browser resolves, has a placeholder for it.
           -->
-          ${submitButton(
-            msgStr("confirmLinkIdpContinue", idpDisplayName ?? idpAlias),
-            "submitAction",
-            "linkAccount"
-          )}
+          ${submitButton(msgStr("confirmLinkIdpContinue"), "submitAction", "linkAccount")}
           ${hideReviewButton
             ? null
             : submitButton(

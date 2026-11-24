@@ -22,7 +22,7 @@ import {
   readSettings,
   togglesFor
 } from "./settings";
-import { fallbackView, renderStock, type StockVariant } from "./stock";
+import { fallbackView, keycloakMessages, renderStock, type StockVariant } from "./stock";
 
 const { getKcContextMock } = createGetKcContextMock({
   kcContextExtension: { themeName: "openremote", properties: {} },
@@ -31,6 +31,15 @@ const { getKcContextMock } = createGetKcContextMock({
 
 /** Matches the realm used in the design, so the two line up when comparing. */
 const REALM_DISPLAY_NAME = "Manufacturer";
+
+/** The language a page renders in, by the rule Keycloakify's getI18n applies. */
+function languageOf(kcContext: KcContext): string {
+  if (!kcContext.realm.internationalizationEnabled) {
+    return "en";
+  }
+
+  return (kcContext as { locale?: { currentLanguageTag: string } }).locale?.currentLanguageTag ?? "en";
+}
 
 /**
  * Drives the page from mocks and switches pages without reloading the document.
@@ -49,6 +58,10 @@ export function runDevMode(root: HTMLElement): void {
 
   /** The context the page on screen was rendered from, for the flows' language switcher. */
   let rendered: KcContext | undefined;
+
+  /** Keycloak's messages for each page and language, once show() has fetched them. */
+  const resolved = new Map<string, Record<string, string>>();
+  const resolvedKey = (pageId: string, language: string) => `${pageId}\n${language}`;
 
   /*
    * The page's mock, shaped for a given selection of settings.
@@ -215,6 +228,19 @@ export function runDevMode(root: HTMLElement): void {
     applySettings(kcContext, settings);
 
     /*
+     * What Keycloak resolves for the keys the page names, merged in as its template would hand them
+     * over. After the settings, which decide the language. A fresh object: the mocks share theirs.
+     */
+    const messages = resolved.get(resolvedKey(pageId, languageOf(kcContext)));
+
+    if (messages !== undefined) {
+      kcContext["x-keycloakify"] = {
+        ...kcContext["x-keycloakify"],
+        messages: { ...messages, ...kcContext["x-keycloakify"].messages }
+      };
+    }
+
+    /*
      * Every link, form action and language URL in the mock points at a Keycloak that is not
      * running (or, for the languages, at a GitHub gist). Replaced with markers that flows.ts
      * resolves to the page Keycloak would show next. This used to rewrite four named keys, which
@@ -255,11 +281,30 @@ export function runDevMode(root: HTMLElement): void {
     const pageId = currentPageId();
     const settings = currentSettings();
     const mine = ++generation;
+    const implemented = implementedPageIds.includes(pageId);
+
+    /*
+     * Keycloak's messages for the page before anything renders, so the page and every render
+     * effectiveToggles compares it with have the same ones. Once per page and language; the page
+     * on screen stays until they arrive.
+     */
+    const kcContext = buildContext(pageId, settings);
+    const language = languageOf(kcContext);
+
+    if (implemented && !resolved.has(resolvedKey(pageId, language))) {
+      void keycloakMessages(pageId, language).then(messages => {
+        resolved.set(resolvedKey(pageId, language), messages);
+
+        if (mine === generation) {
+          show();
+        }
+      });
+      return;
+    }
+
     applyTheme(readThemeOverride(location.search));
 
-    const kcContext = buildContext(pageId, settings);
     const toggles = togglesFor(kcContext);
-    const implemented = implementedPageIds.includes(pageId);
 
     /*
      * The same page with each unticked setting switched on, for the stock renders to compare

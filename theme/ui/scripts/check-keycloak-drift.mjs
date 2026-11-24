@@ -18,6 +18,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renam
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { implementedPageFiles } from "./implemented-pages.mjs";
+import { keyArgument, keyLiterals, messageKeyUses } from "./message-keys.mjs";
 
 const UI_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO_ROOT = resolve(UI_DIR, "..", "..");
@@ -390,89 +391,6 @@ function keycloakMessages(root) {
 }
 
 /*
- * Keys this theme names, each to the files that name it, so the report can say where to change
- * one. The literals in the key argument rather than only one straight after the paren, because a
- * page may choose between two keys and both are rendered somewhere:
- * `msgStr(realm.duplicateEmailsAllowed ? "emailInstructionUsername" : "emailInstruction")`.
- *
- * The key argument alone: what follows it are values interpolated into the message, and a literal
- * among those is not a key. In any of the three quotes, because `msgStr('doLogIn')` type-checks as
- * well and no formatter here rewrites it to double quotes. A key assembled at runtime, which
- * includes a template literal with a `${}` in it, is not a literal and cannot be checked here,
- * which is what advancedMsgStr is for.
- */
-function messageKeyUses() {
-  const uses = new Map();
-
-  for (const file of sourceFiles(join(UI_DIR, "src"))) {
-    const source = readFileSync(file, "utf8");
-
-    for (const call of source.matchAll(/\b(?:msgStr|advancedMsgStr)\(/g)) {
-      const argument = keyArgument(source, call.index + call[0].length);
-
-      for (const key of keyLiterals(argument, /(["'`])(?<key>[^"'`$]+)\1/g)) {
-        uses.set(key, new Set([...(uses.get(key) ?? []), repoPath(file)]));
-      }
-    }
-  }
-
-  return uses;
-}
-
-/*
- * The literals in a key argument that are keys, matched by `literal` into its `key` group.
- *
- * One that is compared against is not: `msgStr(kind === "otp" ? "a" : "b")` names a and b. Nor is
- * one concatenated with something: `msg(prefix + '.' + option)` assembles its key at runtime, and
- * the `.` is no more a key than the prefix is.
- */
-function keyLiterals(argument, literal) {
-  const keys = [];
-
-  for (const match of argument.matchAll(literal)) {
-    const before = argument.slice(0, match.index);
-    const after = argument.slice(match.index + match[0].length);
-
-    if (!/(?:[=!]==?|\+)\s*$/.test(before) && !/^\s*(?:[=!]==?|\+)/.test(after)) {
-      keys.push(match.groups.key);
-    }
-  }
-
-  return keys;
-}
-
-/*
- * The first argument of the call whose parenthesis `start` follows: up to the comma that ends it,
- * nested calls and their commas included, so a key chosen inside one is part of it.
- */
-function keyArgument(source, start) {
-  let depth = 0;
-
-  for (let i = start; i < source.length; i++) {
-    const character = source[i];
-
-    if (depth === 0 && (character === "," || character === ")")) {
-      return source.slice(start, i);
-    }
-
-    if ("([{".includes(character)) {
-      depth++;
-    } else if (")]}".includes(character)) {
-      depth--;
-    }
-  }
-
-  return source.slice(start);
-}
-
-function sourceFiles(dir) {
-  // src/dev never ships, and its strings are the harness's own.
-  return readdirSync(dir, { recursive: true })
-    .filter(path => path.endsWith(".ts") && !/^dev[\\/]/.test(path))
-    .map(path => join(dir, path));
-}
-
-/*
  * One token of TypeScript, close enough to read i18n.ts by: a comment, a string, a word, or any
  * other character but whitespace. Read whole, a URL inside a message does not start a comment, and
  * a brace or a colon inside one is not structure.
@@ -607,7 +525,8 @@ const pageFiles = implementedPageFiles();
 const pages = [...pageFiles.keys()].sort();
 const names = new Set(templateNames(root));
 const messages = keycloakMessages(root);
-const uses = messageKeyUses();
+/* Each key to the files that name it, from the repository root, so the report can say where to change one. */
+const uses = new Map([...messageKeyUses()].map(([key, files]) => [key, new Set([...files].map(repoPath))]));
 const requested = [...uses.keys()].sort();
 const keycloakStandIns = objectKeys(["KEYCLOAK_STAND_INS", "="], 1);
 const ownMessages = objectKeys(["OWN_MESSAGES", "="], 1);
@@ -651,8 +570,9 @@ for (const key of objectKeys(["withCustomTranslations", "("], 2)) {
 }
 
 /*
- * A stand-in is one of Keycloak's messages that Keycloakify's bundled set lacks. Keycloakify's set
- * is what resolves a key in the browser, so until it ships one, ours is all that renders.
+ * A stand-in is one of Keycloak's messages that Keycloakify's bundled set lacks. Keycloak resolves it
+ * on the page like any other key; ours gives the key its type, which comes from Keycloakify's set,
+ * so once that has the key, ours is only a stale copy.
  */
 for (const key of keycloakStandIns) {
   if (!messages.has(key)) {
@@ -663,18 +583,24 @@ for (const key of keycloakStandIns) {
   } else if (Object.hasOwn(keycloakifyMessages, key)) {
     problems.push(
       `src/i18n.ts stands in for "${key}" only because Keycloakify's message set lacked it. It ships ` +
-        "it now, so delete ours from KEYCLOAK_STAND_INS and let Keycloak's own translation through."
+        "it now, so delete ours from KEYCLOAK_STAND_INS."
     );
   }
 }
 
-/* Ours shows in every language, so over a key Keycloak or Keycloakify defines it hides their translations. */
+/*
+ * Ours is a message under a key that only we define. Once Keycloak defines it, Keycloak's message
+ * shows in place of ours; once Keycloakify does, ours hides its translations.
+ */
 for (const key of ownMessages) {
   if (messages.has(key) || Object.hasOwn(keycloakifyMessages, key)) {
+    const consequence = messages.has(key)
+      ? `Keycloak ${version} defines now, so its message shows in place of ours`
+      : "Keycloakify defines now, and ours hides its translations";
+
     problems.push(
-      `OWN_MESSAGES in src/i18n.ts lists "${key}", which ${messages.has(key) ? `Keycloak ${version}` : "Keycloakify"} ` +
-        "defines now, and ours hides its translations. If it means the same, move it to KEYCLOAK_STAND_INS " +
-        "with Keycloak's English while Keycloakify lacks it, or drop it. Otherwise rename ours."
+      `OWN_MESSAGES in src/i18n.ts lists "${key}", which ${consequence}. If it means the same, move it to ` +
+        "KEYCLOAK_STAND_INS with Keycloak's English while Keycloakify lacks it, or drop it. Otherwise rename ours."
     );
   }
 }
@@ -812,13 +738,6 @@ const messagesBefore = keycloakMessages(previousRoot);
 const reworded = requested
   .filter(key => messages.has(key) && messagesBefore.has(key) && messages.get(key) !== messagesBefore.get(key))
   .sort();
-
-/*
- * Stand-ins for keys Keycloak has started defining in this version, so ours is English over a
- * string it translates. Not a failure: until Keycloakify ships one, ours is all that renders, and
- * the check above fails when it does.
- */
-const standIns = keycloakStandIns.filter(key => !messagesBefore.has(key)).sort();
 
 /*
  * Each template in Keycloak's version of our pages that changed, in place or by moving to another
@@ -983,20 +902,17 @@ function otherChangesTable(changes) {
 }
 
 /*
- * Each key Keycloak reworded, set against what our page shows: Keycloakify's copy of the message, or
- * our stand-in when Keycloakify has none. Then any whose placeholders changed, since the arguments
- * our page passes may no longer fit.
+ * Each key Keycloak reworded, before and after. Then any whose placeholders changed, since the
+ * arguments our page passes may no longer fit.
  */
 function rewordedTable(keys) {
-  const shows = key =>
-    Object.hasOwn(keycloakifyMessages, key) ? `"${keycloakifyMessages[key]}"` : `our stand-in, in \`${I18N}\``;
   const placeholders = text => [...new Set(text.match(/\{\d+\}/g) ?? [])].sort().join(", ") || "none";
   const shifted = keys.filter(key => placeholders(english(key, messagesBefore)) !== placeholders(english(key)));
 
   return [
     ...table([
-      ["Key", "Shown by", `Keycloak ${before}`, `Keycloak ${version}`, "Our page shows"],
-      ...keys.map(key => [code(key), namedIn(key), english(key, messagesBefore), english(key), shows(key)])
+      ["Key", "Shown by", `Keycloak ${before}`, `Keycloak ${version}`],
+      ...keys.map(key => [code(key), namedIn(key), english(key, messagesBefore), english(key)])
     ]),
     ...(shifted.length > 0 ? [""] : []),
     ...shifted.map(key => {
@@ -1043,11 +959,11 @@ if (relabelled.length > 0 || unplaced.length > 0) {
       "key is one Keycloak dropped there that our page still uses, often the one a new key replaces." +
       /*
        * What adopting a key costs where the installed Keycloakify has no message for it: a stand-in
-       * in src/i18n.ts, which every language shows in English.
+       * in src/i18n.ts, for its type.
        */
       (startedUsing.some(key => !inKeycloakify(key))
-        ? ` A key not in Keycloakify needs Keycloak's English copied into \`withCustomTranslations\` in \`${I18N}\`, ` +
-          "which every language then shows."
+        ? ` A key not in Keycloakify also needs Keycloak's English in \`KEYCLOAK_STAND_INS\` in \`${I18N}\`, for ` +
+          "its type."
         : ""),
     "",
     ...failureTable()
@@ -1075,24 +991,9 @@ if (reworded.length > 0) {
   others.push([
     "### Reworded upstream",
     "",
-    "Keycloak changed the English of these messages. Our pages use Keycloakify's messages so update Keycloakify." +
-      (reworded.some(key => !Object.hasOwn(keycloakifyMessages, key))
-        ? ` Where the last column names our stand-in, update it in \`${I18N}\` to Keycloak's new English.`
-        : ""),
+    "Keycloak changed the English of these messages, and our pages show the new wording.",
     "",
     ...rewordedTable(reworded)
-  ]);
-}
-
-if (standIns.length > 0) {
-  others.push([
-    "### Our English stands in for these",
-    "",
-    `Keycloak started defining these, and \`withCustomTranslations\` in \`${I18N}\` carries its English for ` +
-      `them, because Keycloakify ${keycloakify.version} has no message for them: every language shows that English. ` +
-      "The check fails once the installed Keycloakify has one, so ours can go.",
-    "",
-    ...standIns.map(key => `- ${code(key)}`)
   ]);
 }
 
@@ -1135,7 +1036,7 @@ const group = (title, sections) => [
  * helps.
  */
 function keycloakifyLag() {
-  const intro = "Our pages take their types, dev-server mocks and messages from Keycloakify, not from Keycloak.";
+  const intro = "Our pages take their types and dev-server mocks from Keycloakify, not from Keycloak.";
 
   if (newer.length === 0) {
     return [`${intro} ${keycloakify.version} is installed, the newest release.`];
@@ -1184,7 +1085,6 @@ if (process.env.GITHUB_ACTIONS === "true") {
     ...startedUsing.map(key => ["error", `Keycloak labels a control with "${key}", our theme does not`]),
     ...otherChanges.map(({ then, now }) => ["warning", `Keycloak ${then === now ? "changed" : `serves ${now} in place of`} ${then}, part of a page we implement`]),
     ...reworded.map(key => ["warning", `"${key}" is reworded upstream, and our pages show it`]),
-    ...standIns.map(key => ["warning", `Keycloak defines "${key}" now, which src/i18n.ts stands in for`]),
     ...newPages
       .filter(page => !keycloakify.types.includes(`"${page}"`))
       .map(page => ["warning", `${page} is new upstream, and Keycloakify ${keycloakify.version} does not have it`])

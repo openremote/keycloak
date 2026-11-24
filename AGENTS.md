@@ -13,8 +13,9 @@ Work from the link you were given: node ids change when the file is reorganized,
 ## Messages
 
 - Do not override Keycloak's wording, in any language. Use the key Keycloak's own template uses for the same control, even where another key reads closer to the design.
-- `withCustomTranslations` is only for keys Keycloakify's bundled message set has no message for: ones Keycloak has none for either (`OWN_MESSAGES` in `src/i18n.ts`), and Keycloak's own keys Keycloakify has yet to ship, copied verbatim (`KEYCLOAK_STAND_INS`). `yarn check-keycloak` fails once Keycloakify ships one. Its `en` block is the fallback for every language, so anything in it shows in every locale.
-- Messages the server resolved take precedence over custom translations, so a client-side override does not reach user-profile labels.
+- Keycloak resolves every key a page names as a literal (`msgStr("doLogIn")`), while it renders the page: `theme/build.gradle` adds a lookup for each to the page's template, from the scan in `scripts/message-keys.mjs`. A key built at runtime is not on that list, so it falls back to Keycloakify's bundled copy unless it arrives in kcContext. The jar ships no messages of its own, so a child theme's `messages_*.properties` and a realm's localization overrides reach every one.
+- `withCustomTranslations` is only for keys Keycloakify's bundled message set has no message for: ones Keycloak has none for either (`OWN_MESSAGES` in `src/i18n.ts`), and Keycloak's own keys Keycloakify has yet to ship, copied verbatim (`KEYCLOAK_STAND_INS`), which give the key its type. `yarn check-keycloak` fails once Keycloakify ships one. Its `en` block is the fallback for every language, so our own messages show in English in every locale.
+- Messages the server resolved take precedence over custom translations, so a client-side override does not reach them.
 - Keycloak sends message keys for anything a realm can configure (user-profile labels, `totp.supportedApplications`, admin messages). Resolve them with `advancedMsgStr`.
 
 ## Vaadin components

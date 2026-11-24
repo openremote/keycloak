@@ -7,6 +7,7 @@
  *
  *   GET  /__stock/status                  what is installed, and its pages, or why nothing is
  *   POST /__stock/render                  {theme, pageId, locale, model, variants?} -> {url, changed}
+ *   POST /__stock/messages                {pageId, locale} -> {messages}, for one of our own pages
  *   GET  /__stock/page/<id>               a rendered page
  *   GET  /__stock/resources/<theme>/...   that theme's resources, looked up through its parents
  *   GET  /__stock/resources/common/...    the resources every theme imports
@@ -22,6 +23,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createInterface } from "node:readline";
+import { pageMessageKeys } from "../scripts/message-keys.mjs";
 
 /*
  * The theme a fresh Keycloak realm uses for its login pages, and so the one to compare against. Not
@@ -227,19 +229,23 @@ export function stockKeycloak({ uiDir }) {
       if (response.error !== undefined) {
         request.reject(Object.assign(new Error(response.error), { template: true }));
       } else {
-        request.resolve(response.html);
+        request.resolve(response);
       }
     });
 
     return proc;
   };
 
-  const renderHtml = (theme, pageId, locale, model) =>
+  /** One request to the renderer, and its response. */
+  const ask = payload =>
     new Promise((resolve, reject) => {
       const id = nextId++;
       pending.set(id, { resolve, reject });
-      renderer().stdin.write(`${JSON.stringify({ id, theme, template: pageId, locale, model })}\n`);
+      renderer().stdin.write(`${JSON.stringify({ id, ...payload })}\n`);
     });
+
+  const renderHtml = (theme, pageId, locale, model) =>
+    ask({ theme, template: pageId, locale, model }).then(response => response.html);
 
   /* ------------------------------------------------------------------ requests */
 
@@ -327,6 +333,30 @@ export function stockKeycloak({ uiDir }) {
     }
   };
 
+  /*
+   * The messages Keycloak resolves for one of our pages: the keys it names, read from the source on
+   * every request so an edit shows, resolved through the theme it falls back to. Ours ships no
+   * messages of its own, so that is where Keycloak finds them too.
+   */
+  const handleMessages = async (request, response) => {
+    const current = status();
+
+    if (!current.available) {
+      sendJson(response, 503, { error: current.reason });
+      return;
+    }
+
+    const { pageId, locale = "en" } = JSON.parse(await readBody(request));
+    const keys = pageMessageKeys().get(pageId) ?? [];
+
+    try {
+      const { messages } = await ask({ theme: current.fallbackTheme, locale, messages: keys });
+      sendJson(response, 200, { messages });
+    } catch (error) {
+      sendJson(response, 503, { error: error.message });
+    }
+  };
+
   /** A theme's resource, looked up through `parent=` the way Keycloak does, or a common one. */
   const resourceFile = relative => {
     const [first, ...rest] = relative.split("/");
@@ -357,6 +387,10 @@ export function stockKeycloak({ uiDir }) {
 
       app.post("/__stock/render", (request, response) => {
         handleRender(request, response).catch(error => sendJson(response, 500, { error: error.message }));
+      });
+
+      app.post("/__stock/messages", (request, response) => {
+        handleMessages(request, response).catch(error => sendJson(response, 500, { error: error.message }));
       });
 
       app.get("/__stock/page/:id", (request, response) => {

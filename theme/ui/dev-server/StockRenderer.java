@@ -53,6 +53,11 @@ import java.util.Properties;
  *   {"id":1,"theme":"keycloak.v2","template":"login.ftl","locale":"en","model":{...}}
  *   {"id":1,"html":"<!DOCTYPE html>..."}         or  {"id":1,"error":"..."}
  *
+ * or, for the messages one of our own pages names:
+ *
+ *   {"id":2,"theme":"keycloak.v2","locale":"de","messages":["doLogIn",...]}
+ *   {"id":2,"messages":{"doLogIn":"Anmelden",...}}
+ *
  * The model is the mock as plain JSON. Everything this adds to it is in keycloakBehavior(), and
  * it is deliberately small: Keycloak's templates distinguish an absent value from an empty one
  * (`usernameHidden??`, `auth?has_content`), so a general "missing means empty" rule would change
@@ -86,6 +91,14 @@ public class StockRenderer {
                 Map<String, Object> request = JSON.readValue(line, Map.class);
                 id = request.get("id");
 
+                if (request.get("messages") instanceof List<?> keys) {
+                    respond(out, id, "messages", renderer.messages(
+                            (String) request.get("theme"),
+                            (String) request.getOrDefault("locale", "en"),
+                            keys.stream().map(String::valueOf).toList()));
+                    continue;
+                }
+
                 @SuppressWarnings("unchecked")
                 String html = renderer.render(
                         (String) request.get("theme"),
@@ -103,7 +116,7 @@ public class StockRenderer {
     }
 
     /** One response per line, so the reader on the other end can split on newlines. */
-    private static void respond(PrintStream out, Object id, String key, String value) throws IOException {
+    private static void respond(PrintStream out, Object id, String key, Object value) throws IOException {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("id", id);
         response.put(key, value);
@@ -118,6 +131,21 @@ public class StockRenderer {
         return expression != null
                 ? "Keycloak's " + where + " needs `" + expression + "`, which this page's mock data does not provide."
                 : where + ": " + e.getMessageWithoutStackTop().lines().findFirst().orElse("");
+    }
+
+    /*
+     * What Keycloak's msg() gives each key the theme has a message for, with no arguments, which is
+     * how Keycloakify's template asks for them on our pages. A key without one is left out, as there.
+     */
+    Map<String, String> messages(String themeName, String locale, List<String> keys) throws TemplateModelException {
+        Properties messages = loaded.computeIfAbsent(themeName, this::load).messages(locale);
+        Map<String, String> resolved = new LinkedHashMap<>();
+        for (String key : keys) {
+            if (messages.containsKey(key)) {
+                resolved.put(key, format(messages, key, List.of()));
+            }
+        }
+        return resolved;
     }
 
     String render(String themeName, String template, String locale, Map<String, Object> model) throws IOException, TemplateException {
