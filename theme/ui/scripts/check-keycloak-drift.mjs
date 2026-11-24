@@ -788,8 +788,12 @@ const moved = [...basenames].sort().flatMap(basename => {
 });
 const inOurPages = ({ then, now }) => watched.includes(then) || watched.includes(now);
 
-const appeared = [...names].filter(name => !previousNames.has(name) && !moved.some(({ now }) => now === name)).sort();
-const removed = [...previousNames].filter(name => !names.has(name) && !moved.some(({ then }) => then === name)).sort();
+/*
+ * A template is new when no theme had one by its name before, and gone when none has one now. A copy
+ * added or dropped beside one that was served throughout is neither, since that one still is.
+ */
+const appeared = [...names].filter(name => asServed(previousRoot, [name.split("/")[1]]).length === 0).sort();
+const removed = [...previousNames].filter(name => asServed(root, [name.split("/")[1]]).length === 0).sort();
 const newPages = [...new Set(appeared.filter(name => isPage(root, name)).map(name => name.split("/")[1]))];
 
 /*
