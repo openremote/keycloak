@@ -8,6 +8,7 @@ import { html, type TemplateResult } from "lit";
 import { createFramePair, type FramePair } from "./frame-pair";
 import { injectStyles } from "./styles";
 import type { KcContext } from "../login/KcContext";
+import { languageTag } from "../i18n";
 
 export type StockRender =
   | { url: string; theme: string; keycloakVersion: string; changed: string[] }
@@ -56,10 +57,6 @@ function toModel(value: unknown, seen = new WeakSet<object>()): unknown {
   );
 }
 
-function localeOf(kcContext: KcContext): string {
-  return (kcContext as { locale?: { currentLanguageTag?: string } }).locale?.currentLanguageTag ?? "en";
-}
-
 /**
  * Renders `kcContext`'s page with a stock theme: "compare" for the theme a fresh realm uses,
  * "fallback" for the one Keycloak serves in place of a page this theme does not implement.
@@ -79,7 +76,7 @@ export async function renderStock(
       body: JSON.stringify({
         theme: which,
         pageId: kcContext.pageId,
-        locale: localeOf(kcContext),
+        locale: languageTag(kcContext),
         model: toModel(kcContext),
         variants: variants.map(variant => ({ id: variant.id, model: toModel(variant.kcContext) }))
       })
@@ -88,6 +85,77 @@ export async function renderStock(
     return (await response.json()) as StockRender;
   } catch (error) {
     return { error: `The dev server did not answer: ${String(error)}` };
+  }
+}
+
+/**
+ * The keys Keycloakify's template has Keycloak resolve from kcContext itself: every string in it
+ * that could be one, unwrapped from "${...}", and the ones it builds for required actions and
+ * profile options (see addNonAutomaticallyGatherableMessagesToXKeycloakifyMessages there).
+ */
+export function contextMessageKeys(kcContext: KcContext): string[] {
+  const keys = new Set<string>();
+  const visit = (value: unknown): void => {
+    if (typeof value === "string") {
+      keys.add(/^\$\{(.+)\}$/.exec(value)?.[1] ?? value);
+    } else if (typeof value === "object" && value !== null) {
+      Object.values(value).forEach(visit);
+    }
+  };
+
+  // What Keycloak would have sent, without the messages this harness merged in.
+  visit({ ...kcContext, "x-keycloakify": undefined });
+
+  const { requiredActions, profile } = kcContext as {
+    requiredActions?: string[];
+    profile?: { attributesByName: Record<string, Attribute> };
+  };
+
+  requiredActions?.forEach(action => keys.add(`requiredAction.${action}`));
+
+  for (const { annotations, validators } of Object.values(profile?.attributesByName ?? {})) {
+    const prefix = annotations?.inputOptionLabelsI18nPrefix;
+
+    if (prefix !== undefined) {
+      validators?.options?.options?.forEach(option => keys.add(`${prefix}.${option}`));
+    }
+  }
+
+  return [...keys].filter(key => key.length <= 200 && /^[a-zA-Z0-9-_.]+$/.test(key)).sort();
+}
+
+type Attribute = {
+  annotations?: { inputOptionLabelsI18nPrefix?: string };
+  validators?: { options?: { options?: string[] } };
+};
+
+/**
+ * What Keycloak resolves for one of our pages, from the stock renderer: the keys the page names,
+ * which theme/build.gradle has it look up, and `keys`, the ones Keycloakify's template does. Used as
+ * they come: that template escapes each message into the page and decodes it again, so the page
+ * gets it unchanged. Undefined when the renderer is not available, and the page then shows its keys.
+ */
+export async function keycloakMessages(
+  pageId: string,
+  language: string,
+  keys: string[]
+): Promise<Record<string, string> | undefined> {
+  try {
+    const response = await fetch("/__stock/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pageId, locale: language, keys })
+    });
+    const body = (await response.json()) as { messages?: Record<string, string>; error?: string };
+
+    if (body.messages === undefined) {
+      throw new Error(body.error ?? `HTTP ${response.status}`);
+    }
+
+    return body.messages;
+  } catch (error) {
+    console.warn(`${pageId} shows its message keys: Keycloak's messages could not be resolved.`, error);
+    return undefined;
   }
 }
 

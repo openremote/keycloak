@@ -31,7 +31,7 @@
   "dependencies": {
     "@openremote/or-vaadin-components": "1.28.1",
     "@openremote/theme": "1.28.1",
-    "keycloakify": "^11.15.11",
+    "keycloakify": "^11.16.4",
     "lit": "^3.3.1"
   },
   "devDependencies": {

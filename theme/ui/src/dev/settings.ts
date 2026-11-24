@@ -109,6 +109,21 @@ type Extra = {
   enable: (kcContext: KcContext) => void;
 };
 
+/* Identity providers by name, with the provider id Keycloak would give a built-in one of each. */
+function providers(displayNames: string[]): Mock[] {
+  return displayNames.map(displayName => {
+    const id = displayName.toLowerCase().replaceAll(" ", "-");
+
+    return {
+      // A placeholder like the rest of the mock's URLs; dev-mode turns it into a flow marker.
+      loginUrl: "#",
+      alias: id,
+      providerId: id,
+      displayName
+    };
+  });
+}
+
 const EXTRAS: Extra[] = [
   {
     id: "social.providers",
@@ -117,13 +132,19 @@ const EXTRAS: Extra[] = [
     enable: kcContext => {
       const social = (kcContext as unknown as Mock).social as Mock;
 
-      social.providers = ["GitHub", "Google"].map(displayName => ({
-        // A placeholder like the rest of the mock's URLs; dev-mode turns it into a flow marker.
-        loginUrl: "#",
-        alias: displayName.toLowerCase(),
-        providerId: displayName.toLowerCase(),
-        displayName
-      }));
+      social.providers = providers(["GitHub", "Google"]);
+    }
+  },
+  {
+    id: "social.providers.grid",
+    // Past three, Keycloak lays the providers out as a grid with a label of its own. The last has
+    // no icon of Keycloak's, so it shows the generic one.
+    label: "more identity providers",
+    available: kcContext => (kcContext as unknown as Mock).social !== undefined,
+    enable: kcContext => {
+      const social = (kcContext as unknown as Mock).social as Mock;
+
+      social.providers = providers(["GitHub", "Google", "Microsoft", "GitLab", "Company SSO"]);
     }
   },
   {

@@ -12,8 +12,8 @@ type PageContext = Extract<KcContext, { pageId: typeof pageId }>;
  * has sent a mail and this page is what the browser waits on.
  *
  * Both links go to the same URL, which is Keycloak's design rather than a mistake here: a GET
- * of the login action re-sends the mail, and it is also how a user who verified in another
- * browser gets this tab moving again.
+ * of the login action re-sends the mail, and it is also how a user who confirmed the link in
+ * another browser gets this tab moving again.
  */
 export function render(kcContext: PageContext, i18n: I18n): TemplateResult {
   const { url, realm, idpAlias, idpDisplayName, brokerContext } = kcContext;

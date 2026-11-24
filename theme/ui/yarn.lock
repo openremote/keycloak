@@ -2499,14 +2499,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"keycloakify@npm:^11.15.11":
-  version: 11.15.11
-  resolution: "keycloakify@npm:11.15.11"
+"keycloakify@npm:^11.16.4":
+  version: 11.16.4
+  resolution: "keycloakify@npm:11.16.4"
   dependencies:
     tsafe: "npm:^1.8.5"
   bin:
     keycloakify: bin/main.js
-  checksum: 10c0/ff8548016f974df9aa675eb9d784321211b42f40e48b5ef3611a5e411a274f063abf83243e26f9fb84c2e176701f46fc0a7566212b133c0a63b7d186f87fc039
+  checksum: 10c0/4379f21bd9281d6c10acfc03921b82c662817b38cddafadabe76920ce6129224d682ac4a29f6073876d95d67a9a5982c1ac44979b17ac3b62ff68aa78dfda9d3
   languageName: node
   linkType: hard
 
@@ -2844,7 +2844,7 @@ __metadata:
     "@rspack/core": "npm:^1.6.0"
     cross-env: "npm:^7.0.3"
     inter-ui: "npm:^4.1.1"
-    keycloakify: "npm:^11.15.11"
+    keycloakify: "npm:^11.16.4"
     lit: "npm:^3.3.1"
     typescript: "npm:^5.9.0"
   languageName: unknown
